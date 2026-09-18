@@ -154,6 +154,10 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
         [ ] CPL 用 JLCPCB 官方五欄格式
         [ ] BOM 料號逐顆核對
         [ ] 零件方向在 Confirm Parts Placement 頁逐顆確認
+        [ ] 鋼網加購（$8，自焊必備）
+        [ ] PCBA 數量設 1 片（其餘自焊，見 006-assembly.md）
+        [ ] LCSC 零件訂單建立並與 JLCPCB 合併運費
+        [ ] 主晶片備品數量確認（T113 ≥3、IT66121 ≥3）
 
 階段 4  bring-up
         [ ] 上電量測各電壓軌

@@ -35,7 +35,8 @@
          RGB 並列 → IT66121 → HDMI Type-A
          （共用同一組 TCON，dts 二選一）
 
-網路     RMII → RTL8201F → RJ45（含變壓器）
+網路     RMII → RTL8201F → RJ45 HR911105A（整合式含變壓器）
+         WiFi 模組預留 footprint 但不上件（DNP），要無線插 USB dongle
 
 USB      Type-C #1  OTG + FEL 燒錄 + 供電
          Type-C #2  CH340N UART log + 供電
@@ -92,4 +93,5 @@ PCB      4 層 · 阻抗控制 · 100×100mm 以內
 | [docs/design/003-network.md](docs/design/003-network.md) | RMII 與乙太網路 |
 | [docs/design/004-usb-boot.md](docs/design/004-usb-boot.md) | Type-C、FEL、燒錄流程 |
 | [docs/design/005-stackup.md](docs/design/005-stackup.md) | 層疊、阻抗、走線規則 |
+| [docs/design/006-assembly.md](docs/design/006-assembly.md) | 組裝策略、工具選擇、備品 |
 | [notes/devlog.md](notes/devlog.md) | 開發日誌 |
