@@ -510,3 +510,65 @@ pg.get_pixmap(dpi=700, clip=fitz.Rect(...)).save("crop.png")
 
 分區裁切 + 高 dpi render,再用視覺讀。這條加進「抽出來的文字用來定位,不用來定案」那條規則的後面 ——
 **定位靠文字,定案靠看圖。**
+
+---
+
+## 2026-09-19 · 周邊 IC 機構圖:三顆全部搞定,兩顆直接用 KiCad 標準件
+
+### 先更正一個我自己的錯誤
+
+前面記「IT66121 只有 8 頁公開簡版,無機構圖」—— **錯的**。
+
+`file` 指令把頁數讀成 8,實際用 pymupdf 開起來是 **40 頁的完整版**,
+`Figure 17. 64-pin QFN Package Dimensions` 就在最後一頁 p.40。
+
+**教訓:`file -b` 對 PDF 的頁數判讀不可靠,要用 pymupdf 的 `doc.page_count`。**
+這跟前面那條「定位靠文字,定案靠看圖」是同一類問題 —— 工具給的摘要不等於內容。
+
+### IT66121FN (QFN-64)
+
+```
+D / E      8.90  9.00  9.10
+D2 / E2    3.58  3.78  3.98     EPAD
+e          0.50 BSC
+b          0.18  0.25  0.30
+L          0.30  0.40  0.50
+```
+
+KiCad `QFN-64-1EP_9x9mm_P0.5mm_EP3.8x3.8mm_ThermalVias` —— EPAD 3.8 vs 3.78,差 0.02,直接用。
+
+### RTL8201F (QFN-32)
+
+```
+D / E      5.00 BSC
+D2 / E2    3.10  3.35  3.60     EPAD
+e          0.50 BSC
+JEDEC MO-220
+```
+
+⚠ **這份 datasheet 涵蓋三種封裝**,查機構圖時極容易拿錯:
+
+```
+10.1  p.55   RTL8201F   QFN-32    ← 用這個
+10.2  p.56   RTL8201FL  LQFP-48
+10.3  p.57   RTL8201FN  QFN-48
+```
+
+**光看「RTL8201F」的檔名不夠,料號尾碼決定封裝。** 下單前 BOM 要核到尾碼。
+
+KiCad 選 `QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias`,不選 EP3.45 ——
+**EPAD 的 land 取略小於封裝標稱值比較安全**,取大的會往 max 3.60 靠,增加與週邊焊盤橋接的風險。
+
+### 結論:只有 T113-S3 要自建 footprint
+
+```
+T113-S3    LQFP-128_14x14mm_P0.4mm  +  自加 EPAD 5.72x5.72
+IT66121    QFN-64-1EP_9x9mm_P0.5mm_EP3.8x3.8mm_ThermalVias      直接用
+RTL8201F   QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias      直接用
+```
+
+原本以為 footprint 是這塊板最大的風險(ROADMAP 風險 (1):錯了整批報廢),
+查完發現 **三顆全部有 JEDEC 標準編號或標準件可對**,風險比預期低很多。
+
+真正要小心的只剩兩件:T113 的 EPAD 選錯組別,以及 RTL8201F 拿錯封裝章節。
+兩件都已寫進 008-footprint.md 的驗收清單。

@@ -42,24 +42,26 @@
 
 | 檔案 | 頁數 | 說明 | 來源 |
 |---|---|---|---|
-| `peripherals/IT66121FN_datasheet_v1.02.pdf` | 8 | RGB → HDMI。**公開簡版** | [seeeddoc.github.io](https://seeeddoc.github.io/BeagleBone_Green_HDMI_Cape/res/IT66121FN_Datasheet_v1.02.pdf) |
+| `peripherals/IT66121FN_datasheet_v1.02.pdf` | **40** | RGB → HDMI，**完整版**（含 Figure 17 機構圖 p.40） | [seeeddoc.github.io](https://seeeddoc.github.io/BeagleBone_Green_HDMI_Cape/res/IT66121FN_Datasheet_v1.02.pdf) |
 | `peripherals/RTL8201F-VB-CG_datasheet_v1.4.pdf` | 67 | RMII PHY，完整版 | [skytech.ir](http://skytech.ir/DownLoad/File/895_RTL8201F.pdf) |
 | `peripherals/CH340DS1_datasheet.pdf` | 11 | USB → UART | [robototehnika.ru](https://robototehnika.ru/file/CH340.pdf) |
 
-⚠ **IT66121 只有 8 頁的公開簡版**（兩個不同來源抓到同一份）。
-有 pin diagram、完整 pin description、電源需求，但**沒有 package dimension、沒有 register map**
-（ITE 完整版需 NDA）。已知封裝是 **QFN64 9×9 mm，PIN65 = GND PAD**。
+> ⚠ **更正**：先前記為「8 頁公開簡版、無機構圖」是錯的 —— `file` 指令把頁數讀錯，
+> 實際是 **40 頁的完整版**，`Figure 17. 64-pin QFN Package Dimensions` 在 p.40。
+> 封裝：QFN-64，9×9 mm，pitch 0.5，EPAD 3.78×3.78，PIN65 = GND PAD。
+> 完整尺寸見 [008-footprint.md](../design/008-footprint.md) §4。
+
+⚠ **RTL8201F 的 datasheet 涵蓋三種封裝**，查機構圖時別拿錯章節：
 
 ```
-影響    footprint 做不了 → 要另外找（KiCad 官方庫的 QFN-64 9×9 標準件比對，
-        或 LCSC 產品頁的 land pattern 圖）
-不影響  register map 不用擔心 —— mainline 的 ite-it66121.c 已經寫好了
+§10.1  p.55   RTL8201F   QFN-32    ← 本專案用這個
+§10.2  p.56   RTL8201FL  LQFP-48
+§10.3  p.57   RTL8201FN  QFN-48
 ```
 
 ### 還需要取得
 
 ```
-[ ] IT66121 的 land pattern / 機構圖
 [ ] RY1303 datasheet（三路 DC-DC，MangoPi 用的，若採用）
 [ ] TPS2051 datasheet（TI，USB Host 限流開關，若採用）
 [ ] XT25F128B datasheet（SPI NOR）

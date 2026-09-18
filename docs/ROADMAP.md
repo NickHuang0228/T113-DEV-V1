@@ -204,7 +204,8 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
 - [ ] KiCad footprint 用 `LQFP-128_14x14mm_P0.4mm`（JEDEC MS-026 BEE，與 datasheet NOTE 8 相符）+ 自加 EPAD
 - [ ] placement 佔位按 **16.8mm**（含腳與焊盤），不是本體的 14mm
 - [ ] EPAD 下方 thermal via 陣列已放，且設為 **plugged**（否則錫會漏到背面，晶片浮起）
-- [ ] IT66121 的 land pattern 已取得（公開版 datasheet 只有 8 頁、無機構圖）
+- [x] IT66121 / RTL8201F 機構圖已取得，KiCad 標準件對得上（見 008-footprint.md §4 §5）
+- [ ] ⚠ RTL8201F 確認用 datasheet §10.1 的 QFN-32，不是 §10.2 LQFP-48 / §10.3 QFN-48
 - [ ] 電源上電時序對照 datasheet，寫成文件記錄
 - [ ] 分壓電阻算出的電壓與標稱值相符（用公式驗算，不靠標籤）
 - [ ] DRC violations / unconnected / schematic parity 三項歸零

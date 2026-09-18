@@ -330,7 +330,8 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [ ] RGB 並列輸出的 pixel clock 上限（`DS §5.11.1 LCD AC Electrical Characteristics, p.60`）
 - [ ] IT66121 的 SYSRSTN 要接 GPIO（MIPI 模式時保持 reset）
 - [ ] IT66121 的 RGB 輸入時脈上限與電源需求
-- [ ] IT66121 的 land pattern（公開版 datasheet 只有 8 頁，無機構圖）
+- [x] IT66121 封裝機構圖 → QFN-64 9×9，pitch 0.5，EPAD 3.78×3.78 `(IT66121 DS Figure 17, p.40)`
+- [x] RTL8201F 封裝機構圖 → QFN-32 5×5，pitch 0.5，EPAD 3.35×3.35 `(RTL DS §10.1, p.55, JEDEC MO-220)`
 - [ ] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 或 3.3V
 - [ ] RY1303（三路 DC-DC）的 LCSC 料況 → 決定用三路或分離式 ×3
 - [ ] 所有零件的 LCSC 料號、即時價、庫存、是否 Basic Part

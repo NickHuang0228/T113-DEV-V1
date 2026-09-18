@@ -1,6 +1,6 @@
 # 008 · Footprint 驗算
 
-版本：v0.1 · 2026-09-19
+版本：v0.2 · 2026-09-19（補上 IT66121 與 RTL8201F 機構圖）
 
 **這是這塊板唯一「錯了整批報廢、且無法補救」的項目**（ROADMAP §3.2 風險 ①）。
 所有數字一律以 datasheet 機構圖為準，不信任任何二手來源。
@@ -170,7 +170,81 @@ EPAD 的鋼網開口做成網格狀（不是一整塊大開口）
 
 ---
 
-## 4. 驗收
+## 4. IT66121FN（QFN-64）
+
+`(IT66121FN datasheet v1.02, Figure 17, p.40/40)`
+
+| Symbol | Min | Nom | Max | 意義 |
+|---|---|---|---|---|
+| A | 0.80 | 0.90 | 1.00 | 總高 |
+| A1 | 0.00 | 0.02 | 0.05 | 站立高度 |
+| A3 | — | 0.20 REF | — | 底部金屬厚 |
+| **b** | 0.18 | **0.25** | 0.30 | 焊盤寬 |
+| **D / E** | 8.90 | **9.00** | 9.10 | 本體 |
+| **D2 / E2** | 3.58 | **3.78** | 3.98 | **EPAD** |
+| **e** | — | **0.50 BSC** | — | pitch |
+| L | 0.30 | 0.40 | 0.50 | 焊盤長 |
+| y | — | — | 0.08 | 共面度 |
+
+**QFN-64，9 × 9 mm，pitch 0.5 mm，EPAD 3.78 × 3.78 mm（pin 65 = GND PAD）。**
+
+### KiCad 對應件
+
+```
+QFN-64-1EP_9x9mm_P0.5mm_EP3.8x3.8mm_ThermalVias
+  焊盤  0.825 × 0.25 mm     vs  b nom 0.25 ✓、L nom 0.40 + fillet ✓
+  pitch 0.50 mm             ✓
+  EPAD  3.8 × 3.8           vs  datasheet 3.78 nom（差 0.02，可用）
+  已含 9 顆 thermal via（0.5mm pad / 0.2mm drill）
+```
+
+**直接用，不必自建。**
+
+---
+
+## 5. RTL8201F（QFN-32）
+
+`(RTL8201F/FL/FN datasheet v1.4 §10.1, p.55)`
+
+| Symbol | Min | Nom | Max | 意義 |
+|---|---|---|---|---|
+| A | 0.75 | 0.85 | 1.00 | 總高 |
+| A1 | 0.00 | 0.02 | 0.05 | 站立高度 |
+| A3 | — | 0.20 REF | — | 底部金屬厚 |
+| **b** | 0.18 | **0.25** | 0.30 | 焊盤寬 |
+| c | — | — | 0.6 | |
+| **D / E** | — | **5.00 BSC** | — | 本體 |
+| **D2 / E2** | 3.10 | **3.35** | 3.60 | **EPAD** |
+| **e** | — | **0.50 BSC** | — | pitch |
+| L | 0.30 | 0.40 | 0.50 | 焊盤長 |
+
+`Note 2: REFERENCE DOCUMENT: JEDEC MO-220`
+
+**QFN-32，5 × 5 mm，pitch 0.5 mm，EPAD 3.35 × 3.35 mm。**
+
+⚠ **這份 datasheet 涵蓋三種封裝，別拿錯章節：**
+
+```
+§10.1  p.55   RTL8201F   QFN-32    ← 本專案用這個
+§10.2  p.56   RTL8201FL  LQFP-48
+§10.3  p.57   RTL8201FN  QFN-48
+```
+
+### KiCad 對應件
+
+```
+QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias
+  焊盤  0.875 × 0.25 mm     ✓
+  pitch 0.50 mm             ✓
+  EPAD  3.3 × 3.3           vs  datasheet 3.35 nom
+```
+
+**選 EP3.3 而非 EP3.45**：EPAD 的 land 取略小於封裝標稱值比較安全
+（大於標稱會往 max 3.60 靠，增加與週邊焊盤橋接的風險）。
+
+---
+
+## 6. 驗收
 
 ```
 [ ] KiCad footprint 的 128 焊盤用 LQFP-128_14x14mm_P0.4mm（MS-026 BEE）
@@ -180,17 +254,30 @@ EPAD 的鋼網開口做成網格狀（不是一整塊大開口）
 [ ] Thermal via 5×5、0.3mm、間距 1.2mm，設為 plugged/tented
 [ ] placement 佔位按 16.8mm（不是 14mm）
 [ ] 1:1 列印，把實體零件壓上去比對
-[ ] IT66121 (QFN64 9×9) 的 land pattern —— 公開版 datasheet 無機構圖，須另尋來源
-[ ] RTL8201F (QFN32) 的 land pattern —— datasheet 67 頁版本應有，待查
+[ ] IT66121 用 `QFN-64-1EP_9x9mm_P0.5mm_EP3.8x3.8mm_ThermalVias`（見 §4）
+[ ] RTL8201F 用 `QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias`（見 §5）
+    ⚠ 確認用的是 datasheet §10.1 QFN-32，不是 §10.2 LQFP-48 或 §10.3 QFN-48
 ```
 
 ---
 
-## 5. 還沒解的
+## 7. 三顆主 IC 總表
+
+| 元件 | 封裝 | 本體 | pitch | EPAD | KiCad 標準件 |
+|---|---|---|---|---|---|
+| T113-S3 | eLQFP128 | 14×14（含腳 16×16） | 0.40 | **5.72×5.72** | `LQFP-128_14x14mm_P0.4mm` + **自加 EPAD** |
+| IT66121FN | QFN-64 | 9×9 | 0.50 | 3.78×3.78 | `QFN-64-1EP_9x9mm_P0.5mm_EP3.8x3.8mm_ThermalVias` |
+| RTL8201F | QFN-32 | 5×5 | 0.50 | 3.35×3.35 | `QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias` |
+
+**三顆全部有底部 EPAD，全部交給 JLCPCB 貼裝**（見 [006-assembly.md](006-assembly.md)）。
+只有 T113-S3 需要自建 footprint，而且只需在標準件上加一個 EPAD。
+
+---
+
+## 8. 還沒解的
 
 ```
-[ ] IT66121 機構圖：公開版只有 8 頁，無 package dimension
-     替代來源：KiCad 內建 QFN-64 9×9 標準件比對 / LCSC 產品頁 land pattern
-[ ] RTL8201F 機構圖：datasheet v1.4（67 頁）應有，未查
-[ ] 接頭類：RJ45 HR911105A / Type-C / microSD / FPC 座（畫 PCB 前）
+[ ] 接頭類機構圖：RJ45 HR911105A / Type-C / microSD / FPC 座（畫 PCB 前，須先定料號）
+[ ] SPI NOR (XT25F128B) 封裝
+[ ] 電源 IC（RY1303 或分離式）封裝
 ```
