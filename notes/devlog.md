@@ -445,3 +445,68 @@ USB-A Host 那條 HS 差分（480Mbps）的品質，比原本規劃「只插個�
 **PG bank 意外地好用：有四組完整 I2C（TWI0~TWI3）和五組 UART。
 但完全沒有 SPI mux** —— 所以排針的 SPI 只能從 PD 的 SPI1 借，且跑 HDMI 時會消失。
 （SPI0 在 PC bank，是 SPI NOR 備援開機裝置，絕對不能對外。）
+
+---
+
+## 2026-09-19 · 機構圖確認:一個差點踩下去的陷阱
+
+用 pymupdf 把 datasheet PDF p.88(紙本 p.78)render 成 600~700 dpi 圖片讀出來 ——
+機構圖是向量圖,`pdftotext` 抽不到表格數字,只抽得到 CAUTION 那段文字。
+
+### 陷阱:Exposed Pad 有六組選項,不是兩組
+
+CAUTION 寫「use the second set of exposed pad size (D3/E3: 5.72 mm REF or 0.225 mm REF)」。
+我原本以為機構圖上只有兩組,讀圖後發現有六組:
+
+```
+①  3.61 REF
+②  5.72 REF          ← CAUTION 指定,正方形 5.72 × 5.72
+③  8.00 REF
+④  7.75 / 6.60 REF
+⑤  5.60 / 5.20 REF
+⑥  5.72 / 5.46 REF   ← ⚠ 也是 5.72 開頭,但是長方形
+```
+
+**只看到「5.72」就選,有 50% 機率拿到 ⑥ 的長方形,短邊差 0.26mm。**
+
+分辨方法:CAUTION 的「5.72 mm REF **or** 0.225 mm REF」,`or` 連的是同一個值的
+mm 與 inch 兩種寫法,不是兩個邊長。只有 ② 是單一值。
+
+**這正是 ROADMAP 寫的「拿欄位字面值當實際幾何」那類坑的第三次** ——
+原廠都標紅字了,但紅字本身還有一層歧義。
+
+### 第二個發現:元件佔位是 16×16,不是 14×14
+
+```
+DS §2.12 寫「eLQFP128, 14 mm x 14 mm」  →  那是 D1/E1(本體)
+D / E = 16.00mm                          →  含伸出來的腳
+KiCad footprint 焊盤外緣                 →  16.80mm
+```
+
+placement 草圖上要畫 17×17mm 的佔位。差 2.8mm,在 100×100mm 的板子上不算小。
+
+### 好消息:KiCad 內建件完全對得上
+
+```
+datasheet NOTE 8        REFERENCE DOCUMENT : JEDEC MS-026
+KiCad LQFP-128_14x14mm_P0.4mm   descr: "JEDEC MS-026 variation BEE, 1.40mm body thickness"
+```
+
+body 14mm、pitch 0.4mm、128 腳、本體厚 1.40mm 四項全符。
+焊盤 1.475 × 0.25mm,對照 datasheet b max 0.23、L nom 0.60,符合 IPC-7351。
+
+**所以 footprint 不用從頭做,只要在標準件上自己加一個 5.72×5.72 的 EPAD。**
+EPAD 與最內側訊號焊盤間隙 4.065mm,非常寬鬆。
+
+### 方法筆記
+
+**機構圖是向量圖,文字抽取拿不到表格。** 正確做法:
+
+```python
+import fitz
+pg = doc[87]
+pg.get_pixmap(dpi=700, clip=fitz.Rect(...)).save("crop.png")
+```
+
+分區裁切 + 高 dpi render,再用視覺讀。這條加進「抽出來的文字用來定位,不用來定案」那條規則的後面 ——
+**定位靠文字,定案靠看圖。**

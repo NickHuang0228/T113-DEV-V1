@@ -99,4 +99,5 @@ PCB      4 層 · 阻抗控制 · 100×100mm 以內
 | [docs/design/005-stackup.md](docs/design/005-stackup.md) | 層疊、阻抗、走線規則 |
 | [docs/design/006-assembly.md](docs/design/006-assembly.md) | 組裝策略、工具選擇、備品 |
 | [docs/design/007-pinmap.md](docs/design/007-pinmap.md) | bank 策略、腳位分配、排針規格 |
+| [docs/design/008-footprint.md](docs/design/008-footprint.md) | 機構圖實測、EPAD 尺寸、footprint 驗算 |
 | [notes/devlog.md](notes/devlog.md) | 開發日誌 |

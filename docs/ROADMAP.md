@@ -166,7 +166,7 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
         [ ] ERC 歸零
 
 階段 2  PCB layout
-        [ ] footprint 逐一驗算 + 1:1 列印比對
+        [ ] footprint 逐一驗算 + 1:1 列印比對（見 008-footprint.md）
         [ ] 層疊與阻抗線寬（用 JLCPCB 回算值）
         [ ] 差分對走線（13 對）
         [ ] RGB666 並列等長（22 條）+ MIPI/RGB 分支 10 顆 0Ω（焊盤距主幹 ≤0.5mm）
@@ -199,7 +199,10 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
 比照上一塊板的標準：
 
 - [ ] T113-S3 / IT66121 / RTL8201F footprint 對照 datasheet 機構圖逐項核對，1:1 列印比對
-- [ ] **T113-S3 的 EPAD 用 datasheet §7.2 的「第二組」尺寸 D3/E3 = 5.72 mm REF**（p.78 CAUTION）
+- [x] **T113-S3 的 EPAD 用 datasheet §7.2 的「第二組」尺寸 → 5.72 × 5.72 mm 正方形**
+      ⚠ 機構圖有六組，第 ⑥ 組也是 5.72 開頭但為長方形 5.72/5.46 —— 別選錯
+- [ ] KiCad footprint 用 `LQFP-128_14x14mm_P0.4mm`（JEDEC MS-026 BEE，與 datasheet NOTE 8 相符）+ 自加 EPAD
+- [ ] placement 佔位按 **16.8mm**（含腳與焊盤），不是本體的 14mm
 - [ ] EPAD 下方 thermal via 陣列已放，且設為 **plugged**（否則錫會漏到背面，晶片浮起）
 - [ ] IT66121 的 land pattern 已取得（公開版 datasheet 只有 8 頁、無機構圖）
 - [ ] 電源上電時序對照 datasheet，寫成文件記錄

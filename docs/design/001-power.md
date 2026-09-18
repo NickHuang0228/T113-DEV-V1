@@ -413,9 +413,12 @@ to design the PCB footprint because the T113-S3 package is designed
 according to this size.
 ```
 
-**機構圖裡有兩組 exposed pad 尺寸，原廠明講要用第二組。** 拿錯 → 整批報廢。
+**機構圖裡有六組 exposed pad 尺寸，原廠明講要用第二組 → 5.72 × 5.72 mm 正方形。**
 
-封裝：**eLQFP128, 14 × 14 × 1.4 mm** `(DS §2.12 p.19 / §7.1 p.77)`
+⚠ 第 ⑥ 組也是 `5.72 / 5.46`（長方形），只看到「5.72」很容易選錯。
+完整機構圖數字與判讀見 [008-footprint.md](008-footprint.md)。
+
+封裝：**eLQFP128，本體 14 × 14 × 1.4 mm，含腳 16 × 16 mm** `(DS §2.12 p.19 / §7.2 p.78)`
 
 ### 7.2 thermal via：兩種做法互斥，layout 階段就要選
 
