@@ -20,8 +20,12 @@ Allwinner T113-S3
   協處理器  RISC-V C906 @1.0GHz + HiFi4 DSP
   GPU      Mali-G31 MP2
   記憶體    128MB DDR3（SIP 封裝，晶片內建）
-  封裝      QFP128  ⚠ pitch 與尺寸待從 datasheet 確認
-  電壓      VDD_CPU 0.9~1.1V / VDD_SYS 1.1V / VCC_IO 3.3V / VCC_PLL 1.8V
+  封裝      eLQFP128  14 × 14 × 1.4 mm  (DS §2.12 p.19 / §7.1 p.77)
+            底部 EPAD = pin 129 = 這顆晶片唯一的數位地（見 001-power.md §7）
+  電壓      VDD-CORE / VDD-SYS  0.9V     ⚠ 不是 1.1V
+            VCC-DRAM0/1         1.5V     ⚠ 內建 DDR3 仍要外部供電
+            VCC-IO / GPIO bank  3.3V
+            1.8V 群              由晶片內建 LDOA 供（@260mA 上限）
   價格      約 $8（LCSC，需查即時價與庫存）
 ```
 
@@ -35,10 +39,23 @@ Allwinner T113-S3
 
 | 輸出 | 規格 | 元件 | 差分對 |
 |---|---|---|---|
-| MIPI DSI | 4 lane + clock | FPC 座 0.5mm | **5 對** |
-| HDMI | RGB 並列 → HDMI 1.4 | IT66121（LQFP64） | **4 對 TMDS** |
+| MIPI DSI | 4 lane + clock，1920×1200@60 | FPC 座 0.5mm | **5 對** |
+| HDMI | RGB666 並列 → HDMI 1.4，1920×1080@60 | IT66121（**QFN64 9×9，底部 GND pad**） | **4 對 TMDS** |
 
-**兩者共用同一組 TCON，dts 二選一。** ⚠ 待確認：T113-S3 是否只有一組 TCON，若有兩組則可同時輸出。
+**⚠ 兩者共用同一組實體接腳 PD0~PD9，不只是共用 TCON。** `(DS Table 4-3 Pin Multiplexing)`
+
+```
+MIPI DSI   PD0 ~ PD9    （4 lane + clock = 5 對）
+RGB 並列   PD0 ~ PD21   （18 資料 + 4 控制 = 22 條）
+重疊       PD0 ~ PD9    完全重疊
+```
+
+軟體切換不能把電氣負載切掉 → **PD0~PD9 用 10 顆 0Ω 隔離，MIPI 直通、IT66121 走分支。**
+本專案優先序：**MIPI DSI > RGB/HDMI**。詳見 [002-display.md](design/002-display.md) §1。
+
+⚠ **T113-S3 的 RGB 最多 RGB666（18-bit），沒有 RGB888** ——
+PD bank 上不存在 LCD0-D0/D1/D8/D9/D16/D17。HDMI 輸出因此是 26 萬色，漸層會有 banding。
+MIPI DSI 則支援 RGB888。
 
 選 IT66121 而非 LT8618SX 的理由：
 
@@ -80,22 +97,48 @@ SPI NOR   16MB（XT25F128B 或同級），FEL 可燒，備援開機
 音訊    內建 codec → 3.5mm 座（line-out）
 按鍵    FEL / RESET / 電源
 LED     電源 / 使用者 ×2
-排針    I2C ×2、SPI ×1、UART 備援、GPIO ×20
+排針    26-pin (2×13)，全部經限流電阻
+        I2C ×2        PG7/PG8、PG9/PG10        隨時可用
+        UART 備援 ×1  PG13/PG15                隨時可用
+        GPIO ×10      PG0~PG6, PG11, PG12, PG14  隨時可用
+        SPI ×1        PD10~PD13                ⚠ 僅 MIPI 模式
+
+⚠ 原本寫 GPIO ×20 是未經腳位驗算的數字。PG bank（唯一適合對外的 bank）只有 16 支。
+WiFi footprint 移除後全部 16 支可用。詳見 [007-pinmap.md](design/007-pinmap.md)。
 ```
 
 ---
 
-### 3.6 WiFi（預留 footprint，不上件）
+### 3.6 WiFi：完全不做
 
 ```
-RTL8723DS SDIO 模組    footprint + SDIO 走線 + 天線區 + 匹配網路位置全部畫出
-BOM 不列 → JLCPCB 不上件 → 不收費
+v0.1   預留 RTL8723DS footprint + SDIO 走線 + 天線區（DNP，畫但不焊）
+v0.2   ✗ 完全移除
 ```
 
-**畫出來就練到 RF layout，不一定要焊。** 要無線功能就插 USB WiFi dongle
-（RTL8188EU / MT7601U，mainline driver 完整，零 layout 成本）。
+**移除的理由不是成本，是腳位。** WiFi 的 SDIO1 走 PG0~PG5，
+而 PG 是這塊板**唯一適合對外的 bank**（其他 bank 一燒就變磚或失去網路，
+見 [007-pinmap.md](design/007-pinmap.md) §3）。
 
-理由與 RF keep-out 規則見 [003-network.md](design/003-network.md) 第 6 節。
+```
+WiFi footprint 吃掉 PG 16 支裡的 6 支 = 37%
+排針的純 GPIO 從 10 支掉到 4 支
+```
+
+移除後的收穫：
+
+```
++ 排針純 GPIO   4 → 10 支
++ 板面積        省 30 × 20 mm（更容易守住 100×100mm 的價格斷點）
++ GND 平面      天線區的挖空消失 → 不必處理「挖空 GND 又不破壞旁邊差分回流」
++ VCC-PG 電壓   不再被 SDIO 綁住，可自由選 3.3V 配合外接模組
+− RF layout     練不到（這是唯一的損失，且是學習目標而非功能）
+```
+
+**要無線就插 USB WiFi dongle**（RTL8188EU / MT7601U，mainline driver 完整，零 layout 成本）。
+
+這是本專案第三次用同一招：**WiFi → USB dongle、攝影機 → USB UVC、無線 → USB dongle。**
+當一個功能要吃掉稀缺腳位或帶來 layout/driver 風險，而 USB 上有成熟替代品時，就走 USB。
 
 ---
 
@@ -109,7 +152,11 @@ BOM 不列 → JLCPCB 不上件 → 不收費
 | 乙太 TX/RX | 2 | 100Ω 差分 | 100 Mbps | ★ |
 | **合計** | **13 對** | | | |
 
-加上 RGB 並列 28 條單端（24 資料 + HS/VS/DE/CK），**這是這塊板 layout 工作量的主體**。
+加上 RGB 並列 **22 條**單端（**18 資料** + HS/VS/DE/CK）與 10 顆 0Ω 隔離電阻，
+**這是這塊板 layout 工作量的主體**。
+
+⚠ 差分對總數仍是 13 對，但 MIPI 的 5 對與 RGB 的前 10 條是**同一組實體走線**，
+分支點的處理（0Ω 貼著主幹，stub ≤ 0.5mm）是這塊板最精細的一段 layout。
 
 ---
 
@@ -117,13 +164,23 @@ BOM 不列 → JLCPCB 不上件 → 不收費
 
 ```
 Type-C VBUS 5V
-  ├─ DC-DC  →  1.1V   VDD_CPU + VDD_SYS     ~600mA
-  ├─ DC-DC  →  1.8V   VCC_PLL / MIPI / DDR IO  ~200mA
-  ├─ LDO    →  3.3V   VCC_IO / PHY / bridge  ~400mA
-  └─ 直通    →  5V    USB-A Host（含限流）    500mA
+  ├─ DC-DC   →  3.3V   VCC-IO / GPIO bank / PHY / IT66121 / LDO-IN   ~470mA
+  ├─ DC-DC   →  1.5V   VCC-DRAM0/1（DDR3 本體）                       TBD
+  ├─ DC-DC   →  0.9V   VDD-CORE0/1 + VDD-SYS0/1/2                    TBD
+  ├─(晶片內)  →  1.8V   VCC-PLL / VCC-RTC / VCC-LVDS / AVCC
+  │                     由內建 LDOA 供，上限 260mA  ⚠ 須先算負載
+  └─ 直通     →  5V    USB-A Host（含限流）                           500mA
+
+外部電壓：3.3V / 1.5V / 0.9V（MangoPi 用單顆 RY1303 三路 DC-DC）+ **一組外部 1.8V**
+
+⚠ 1.8V 不要全押內建 LDOA（只有 260mA，且 VDD18-DRAM / AVCC / VCC-TVIN 在 datasheet 是 TBD）。
+MangoPi 自己也放了外部 XC6206-1.8V LDO。多一顆 $0.05 換掉一個未知數。
 ```
 
 詳見 [001-power.md](design/001-power.md)。峰值估算 **~900mA @5V = 4.5W**，Type-C 5V/3A 餘裕三倍。
+
+⚠ VDD-CORE / VDD-SYS / VCC-DRAM 的電流在 datasheet 裡是 **TBD**（全志沒填），
+只能靠估算或從參考設計反推。這是這份 datasheet 最大的缺口。
 
 ---
 
@@ -157,12 +214,11 @@ CH340N ×2                               $1.6
 RJ45 含變壓器 ×2                         $4
 接頭（HDMI / Type-C ×2 / USB-A / SD / FPC / 排針）  $11
 SPI NOR / 晶振 ×3 / 被動件 ~80 顆        $12
-Extended part fee（約 6 種）              $18
 PCB 4 層 5 片 + 阻抗控制                  $20
-PCBA setup + 2 片貼裝                     $35
+PCBA 服務費（部分貼裝 3 片，見 7.1）       $21
 運費 DHL                                 $18
 ──────────────────────────────────────────────
-合計                                     $154 ≈ NT$4,960
+合計                                     $122 ≈ NT$3,930
 ```
 
 ⚠ 除 PCB / PCBA / 運費外，零件價格均為估算，下單前須逐項查 LCSC 即時價與庫存。
@@ -171,18 +227,41 @@ PCBA setup + 2 片貼裝                     $35
 
 PCB 最低量就是 5 片，**PCBA 貼幾片自己選**，剩下的當裸板寄回。
 
-| | 全貼 2 片 | **貼 1 片 + 自焊 2 片** | 全自焊 |
+| | 全貼 2 片 | 貼 1 片 + 自焊 2 片 | **部分貼裝 ×3 片** |
 |---|---|---|---|
+| JLCPCB 貼什麼 | 全部零件 | 全部零件 | **只貼 3 顆難焊 IC** |
 | PCB 5 片 + 阻抗 | $20 | $20 | $20 |
-| PCBA | $53 | **$35** | $0 |
-| LCSC 自購零件 | — | **$45** | $70 |
-| 鋼網 | — | **$8** | $8 |
+| PCBA 服務費 | ~$49 | ~$48 | **~$21** |
+| LCSC 自購零件 | — | $45 | $45 |
+| 鋼網 | — | $8 | **不需要** |
 | 合併運費 | $18 | $18 | $18 |
-| **合計** | $91 | **$126 ≈ NT$4,060** | $116 ≈ NT$3,740 |
-| 拿到手 | 2 貼好 + 3 裸板 | **1 貼好 + 2 自焊 + 2 備用** | 5 片全自焊 |
+| **合計** | ~$87 | ~$139 | **~$104 ≈ NT$3,330** |
+| 拿到手 | 2 貼好 + 3 裸板 | 1 貼好 + 2 自焊 + 2 備用 | **3 片主晶片貼好 + 2 裸板** |
 
-**採用中間那欄。** 理由不是省錢，是除錯 —— 有一片「確定焊得好」的板子，
-它不開機就一定是設計問題，不是虛焊。
+**改採最右欄「部分貼裝」。** v0.1 原本選中間那欄，查完 datasheet 後改掉，兩個理由：
+
+**① T113-S3 的 EPAD 是唯一的數位地，不焊就不會動，而且焊得好不好看不見。**
+IT66121 是 QFN64 + 底部 GND pad、RTL8201F 是 QFN32 —— 三顆都是手焊高風險件。
+把「不可觀測的焊點」外包，「可觀測的」留給自己，跟當初選 QFP 不選 BGA 是同一個判斷標準。
+
+**② 部分貼裝反而更便宜。** JLCPCB 的 PCBA 費用幾乎全在 **Extended part 上料費 $3.07/種**，
+跟貼幾片、幾個焊點關係很小：
+
+```
+只貼 3 顆 IC  →  3 種 × $3.07 = $9.21
+全部零件      → ~12 種 × $3.07 = $36.84
+多貼 2 片的焊點成本 = 227 joints × 2 × $0.0016 = $0.73     ← 可以忽略
+```
+
+代價：**鋼網用不上了**（IC 已貼好，鋼網壓不平），80 顆被動件 × 3 片要烙鐵手焊。
+累但零風險，焊壞看得見也重焊得了。
+
+⚠ **建議被動件改用 0603 而非 0402** —— 手焊難度差一個等級，而面積對 100×100mm 不是問題。
+這要在畫原理圖前決定。
+
+⚠ PCBA 服務費依 JLCPCB 官方價目表（2026-09-09 版）計算：
+`setup $8.18 + stencil $1.53 + confirm placement $0.45 + feeder $3.07/種 + SMT $0.0016/joint`。
+料號種類數是估的，下單前用實際 BOM 重算。
 
 JLCPCB 與 LCSC 同屬嘉立創，**兩邊訂單可合併出貨，運費只付一次**。
 
@@ -198,8 +277,23 @@ JLCPCB 與 LCSC 同屬嘉立創，**兩邊訂單可合併出貨，運費只付�
 |---|---|
 | eMMC | SD 卡開機就夠；焊死了不好換 |
 | USB Hub | 增加複雜度，用不到 |
-| WiFi 模組 | driver 風險高，且 U-Boot 階段用不到；要無線插 USB dongle |
-| MIPI CSI | 先把顯示這條鏈路走通，攝影機留到 V2 |
+| WiFi 模組（含 footprint） | driver 風險高、U-Boot 階段用不到，且 SDIO 會吃掉 PG bank 6 支腳 —— 那是唯一適合對外的 bank。要無線插 USB dongle |
+| **攝影機（Parallel CSI）** | **與乙太網路共用 PE0~PE9，二選一** —— 乙太是核心決定（U-Boot TFTP+NFS），不換。要攝影機插 **USB UVC**，mainline `uvcvideo` 完全支援，零 layout 成本 |
+
+⚠ **T113-S3 沒有 MIPI CSI**，只有 8-bit Parallel CSI（DVP）`(DS §2.7.1 p.7)`。
+腳位表裡只有一組 `NCSI0-*`，位於 PE bank `(DS Table 4-3)`：
+
+```
+CSI 需要   PE0 ~ PE11    NCSI0-HSYNC/VSYNC/PCLK/MCLK/D[7:0]
+RMII 需要  PE0 ~ PE9     CRS-DV/RXD0/RXD1/REF-CLK/TXD0/TXD1/TX-EN/MDC/MDIO
+重疊       PE0 ~ PE9     完全衝突
+```
+
+（MangoPi 原理圖的網路名就叫 `VCC-RMII-CSI` —— 他們也知道這兩個共用。
+MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
+
+**決定：PE bank 專用於 RMII，CSI 完全不畫。** 攝影機走 USB。
+連帶好處：PE10~PE13 空出來可當 GPIO。
 | PMIC | 分離式 DC-DC/LDO 比較好量測、好除錯 |
 | DDR | 晶片內建 |
 
@@ -211,10 +305,29 @@ JLCPCB 與 LCSC 同屬嘉立創，**兩邊訂單可合併出貨，運費只付�
 
 下單前必須逐項查證，未確認不進 layout：
 
-- [ ] T113-S3 封裝型式、pitch、焊盤尺寸（來源必須是 datasheet 機構圖）
-- [ ] T113-S3 是否只有一組 TCON（決定 MIPI 與 RGB 能否並存）
-- [ ] T113-S3 各電源軌的上電時序要求
-- [ ] MIPI DSI 最高 lane rate 與支援解析度
-- [ ] RGB 並列輸出的 pixel clock 上限
+**已確認**
+
+- [x] T113-S3 封裝型式 → **eLQFP128, 14 × 14 × 1.4 mm** `(DS §2.12 p.19 / §7.1 p.77)`
+- [x] T113-S3 各電源軌電壓 → 見 §5 與 001-power.md §1 `(DS §5.3 p.45-46)`
+- [x] T113-S3 上電時序 → T1 > 2ms、T2 > 64ms，關機無限制 `(DS §5.12 p.73-74)`
+- [x] 熱阻 θJA = 20.36 °C/W、Tj max = 110 °C → 不需散熱片 `(DS §6 p.76)`
+- [x] EPAD (pin 129) 是唯一數位地 → 必焊，交給 PCBA `(DS §4.1 p.23)`
+- [x] IT66121 封裝 → **QFN64 9×9 mm + 底部 GND pad**（非 LQFP64）
+- [x] MIPI 與 RGB 共用 PD0~PD9 實體接腳 → 需 0Ω 隔離 `(DS Table 4-3)`
+- [x] RGB 最多 RGB666，非 RGB888 → 22 條而非 28 條 `(DS Table 4-3 / §2.6.1 p.6)`
+- [x] 解析度上限 → RGB 1920×1080@60、MIPI DSI 1920×1200@60 `(DS §2.6 p.6)`
+
+**未確認**
+
+- [ ] T113-S3 pitch / 焊盤尺寸 b, L / body D,E / **D3,E3** `(DS §7.2 p.78)`
+      ⚠ p.78 有 CAUTION：exposed pad 有兩組尺寸，**必須用第二組 D3/E3 = 5.72 mm REF**
+- [ ] MIPI DSI 最高 lane rate（解析度上限已確認 1920×1200@60，`DS §2.6.2 p.6`）
+- [ ] MIPI D-PHY 的電源軌與 4-lane 電流（決定 1.8V 要不要外部供）
+- [ ] VDD18-DRAM (pin 50) 接內建 LDOA 還是外部 1.8V
+- [ ] RGB 並列輸出的 pixel clock 上限（`DS §5.11.1 LCD AC Electrical Characteristics, p.60`）
+- [ ] IT66121 的 SYSRSTN 要接 GPIO（MIPI 模式時保持 reset）
 - [ ] IT66121 的 RGB 輸入時脈上限與電源需求
+- [ ] IT66121 的 land pattern（公開版 datasheet 只有 8 頁，無機構圖）
+- [ ] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 或 3.3V
+- [ ] RY1303（三路 DC-DC）的 LCSC 料況 → 決定用三路或分離式 ×3
 - [ ] 所有零件的 LCSC 料號、即時價、庫存、是否 Basic Part

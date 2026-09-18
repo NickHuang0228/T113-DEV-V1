@@ -8,7 +8,12 @@
 |---|---|---|---|
 | **Type-C #1** | OTG + FEL 燒錄 | 1 對 USB HS | ✓ 5V 進 |
 | **Type-C #2** | CH340N → UART0 log | — | ✓ 5V 進 |
-| **USB-A** | Host（WiFi dongle / 鍵鼠） | 1 對 USB HS | 5V 出（限流） |
+| **USB-A** | Host（**WiFi dongle + UVC 攝影機** + 鍵鼠） | 1 對 USB HS | 5V 出（限流） |
+
+> ⚠ **USB 在這塊板上扛三個角色**：Type-C #1 的 FEL 燒錄、USB-A 的 WiFi dongle、USB-A 的 UVC 攝影機。
+> WiFi 模組與 Parallel CSI 都被砍掉改走 USB（見 [003-network.md](003-network.md) §6 與 SPEC §3.6），
+> 所以 USB-A Host 那對 HS 差分**不是次要走線** —— 90Ω 阻抗與對內等長要跟 Type-C 那對一樣認真做。
+> 原本規劃只是「插個鍵鼠」，現在無線與影像都靠它。
 
 兩個 Type-C 都能供電，插哪個都能開機。
 
@@ -182,4 +187,6 @@ bring-up 驗證順序：
 5. sunxi-fel spl u-boot-spl.bin 測試 SPL 能否執行
 6. SD 卡開機到 U-Boot
 7. USB-A 插隨身碟，確認 Host 可用
+8. USB-A 插 WiFi dongle（RTL8188EU / MT7601U），確認能連線
+9. USB-A 插 UVC 攝影機，確認 /dev/video* 出現且能取流
 ```

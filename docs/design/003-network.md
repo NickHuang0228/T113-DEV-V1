@@ -170,72 +170,76 @@ bring-up 時的驗證順序：
 
 ---
 
-## 6. WiFi：畫但不焊（DNP）
+## 6. WiFi：完全不做（v0.2 決定）
 
-### 決定
-
-```
-PCB 上放 footprint、SDIO 走線、天線區域、匹配網路位置
-BOM 不列這些料 → JLCPCB 不上件 → 不收費
-```
-
-實際花費：**$0**（只要板子仍在 100×100mm 內）。
-
-### 為什麼不上件
-
-**硬體成本其實不高**（約 NT$550）：
+### 決定歷程
 
 ```
-RTL8723DS 模組 ×2（WiFi+BT, SDIO）    $6
-32.768kHz 晶振 ×2                     $0.4
-1.8V LDO ×2（部分模組需要）            $0.6
-u.FL 座 ×2 + 外接天線 ×2              $3
-匹配網路 π型 + 去耦 ×2                 $1
-Extended part fee                     $6
+v0.1   預留 RTL8723DS footprint + SDIO 走線 + 天線區 + 匹配網路（DNP，畫但不焊）
+       理由：畫出來就練到 RF layout，不上件所以 $0
+v0.2   ✗ 完全移除
+       理由：腳位成本遠大於預期
 ```
 
-**貴的是另外兩項：**
+### 為什麼改掉
 
-**① PCB 面積可能跳級**
+做完 bank 分析（[007-pinmap.md](007-pinmap.md) §3）後發現：
 
 ```
-模組本體          ~12×12mm
-RF keep-out       天線周圍 5~10mm 淨空
-PCB 天線（若用）   額外 ~15×5mm
-實際吃掉           約 30×20mm
+PB / PC / PF   VCC-IO   SD 開機 + NOR 開機 + UART log   一燒就變磚
+PD             VCC-PD   MIPI + HDMI                     顯示全失
+PE             VCC-PE   RMII                            開發循環沒了
+PG             VCC-PG   ★ 唯一「燒了也不痛」的 bank
 ```
 
-超過 100×100mm 的話，4 層 5 片從 $20 跳到 $35~50。
-而且天線下方挖空會切斷 GND 平面，**可能影響旁邊 MIPI/TMDS 的回流路徑**。
+**排針必須放 PG，別無選擇。** 而 WiFi 的 SDIO1 剛好也在 PG0~PG5。
 
-**② driver 風險取決於 kernel 選擇**
+```
+PG 共 16 支
+  − 6 支 WiFi SDIO1（DNP 也要畫走線）
+  = 10 支
+  − 4 支 I2C ×2
+  − 2 支 UART 備援
+  = 4 支純 GPIO
+```
 
-| kernel | RTL8723DS SDIO | 風險 |
-|---|---|---|
-| mainline 6.x | `rtw88` 已有 SDIO 支援 | 低 |
-| **全志 BSP 5.4 / Tina** | **需 out-of-tree driver，版本被綁死** | **高** |
+**一個永遠不焊的模組，吃掉板上最安全 bank 的 37%。** 這筆帳 v0.1 沒算。
 
-第一塊板建議走**全志 BSP**（外設齊全、bring-up 容易），那 WiFi 就落在高風險那格。
+### 移除後的收穫
+
+```
++ 排針純 GPIO    4 → 10 支
++ 板面積         省 30 × 20 mm（更容易守住 100×100mm 的 JLCPCB 價格斷點）
++ GND 平面完整   天線區挖空消失 → 不必處理「挖空 GND 又不破壞旁邊差分回流」
++ VCC-PG 自由    不再被 SDIO 電平綁住，可選 3.3V 配合外接模組
++ layout 工時    少畫 6 條 SDIO + 匹配網路 + keep-out
+− RF layout      練不到
+```
+
+**唯一的損失是學習目標，不是功能。** 而那個學習目標可以留到專用的 RF 練習板，
+不需要綁在第一塊 Linux 板上一起冒險。
 
 ### 要無線就插 USB dongle
 
 ```
-RTL8188EU / MT7601U / RTL8812AU   $3~5
-mainline driver 完整、零 layout 成本、零風險、隨時可拔
+RTL8188EU / MT7601U     mainline driver 完整
+零 layout 成本、零 RF 風險、零腳位成本
+插在既有的 USB-A Host 上
 ```
 
-### 但 layout 還是要畫 —— 因為那才是學習目標
+⚠ 但注意：**USB 現在同時扛 FEL 燒錄、WiFi dongle、UVC 攝影機三個角色。**
+USB-A Host 那條 HS 差分（480 Mbps）的品質，比原本規劃「只插個鍵鼠」時重要得多。
+90Ω 差分阻抗與等長要認真做。
 
-畫出來就練到了，不一定要焊：
+### 這是本專案第三次用同一招
 
 ```
-RF keep-out 規劃
-天線淨空區與所有層挖空
-π 型匹配網路擺位（靠近天線饋入點）
-50Ω 單端 RF 走線
-如何在挖空 GND 的同時不破壞旁邊差分的回流   ← 最有價值的一項
+WiFi 模組   →  USB dongle
+攝影機 CSI  →  USB UVC
+WiFi footprint → 完全移除，USB dongle
 ```
 
-最後一項是真正的取捨題，不是照抄規則能解的。
+**模式：當一個功能要吃掉稀缺腳位、或帶來 layout/driver 風險，
+而 USB 上有成熟替代品時，就走 USB。**
 
-之後真要用，手焊模組上去即可（SDIO 走線已經在板子上）。
+第一塊 Linux 板的成功標準是「開機」，每砍掉一項，成功機率就高一點。

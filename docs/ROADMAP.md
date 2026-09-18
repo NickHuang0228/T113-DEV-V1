@@ -20,7 +20,7 @@
 
 | 晶片 | DDR | 封裝 | MIPI DSI | HDMI | 結論 |
 |---|---|---|---|---|---|
-| **T113-S3** | **內建 SIP** | **QFP128** | **✓** | 需 bridge | **選定** |
+| **T113-S3** | **內建 SIP** | **eLQFP128** | **✓** | 需 bridge | **選定** |
 | Allwinner H3 | 外接 DDR3 | BGA347 | **✗ 無** | 原生 4K@30 | 淘汰 |
 | F1C200s | 內建 64MB | LQFP128 | ✗ | ✗ | 太弱 |
 | RK3566 | 外接 DDR4 | BGA636 0.8mm | ✓ | ✓ | 太難（DDR4） |
@@ -69,13 +69,21 @@ T113-S3 沒有原生 HDMI，要靠 IT66121 把 RGB 並列轉成 HDMI。這看似
 
 ### 3.2 主要風險（依嚴重度）
 
-**① QFP128 footprint 尺寸錯 —— 致命且無法補救**
+**① eLQFP128 footprint 尺寸錯 —— 致命且無法補救**
 
 ```
-0.4mm pitch，焊盤長寬或間距錯了 → 整批報廢
+焊盤長寬或間距錯了 → 整批報廢
 來源必須是 datasheet 的機構圖，不能抄網路
 下單前務必 1:1 列印比對
+
+⚠ datasheet §7.2 (p.78) 有原廠 CAUTION：
+   exposed pad 的機構圖上有「兩組」尺寸，
+   必須用第二組 D3/E3 = 5.72 mm REF 來畫 footprint。
+   拿錯那組 → 整批報廢。
 ```
+
+EPAD 本身也是致命項：它是這顆晶片**唯一的數位地**（128 隻腳裡只有 1 支 AGND），
+沒焊到就完全不會動，而且焊得好不好無法目視檢查。詳見 001-power.md §7。
 
 上一塊板踩過兩次「拿欄位字面值當實際幾何」的坑（J1 custom pad、ESP32 模組 pad 自轉 270°）。這次的教訓是：**footprint 一律回到原廠機構圖驗算，不信任任何二手來源。**
 
@@ -97,16 +105,25 @@ T113-S3 對 VDD_CPU / VDD_SYS / VCC_IO / VCC_PLL 的上電順序有要求
 短距離（<10cm）即使偏差 10% 通常仍可動
 ```
 
-**④ RGB 並列等長 —— HDMI 無畫面或花屏**
+**④ MIPI 與 RGB 共用 PD0~PD9 —— 分支處理錯了 MIPI 就不會亮**
 
 ```
-24 條資料 + 4 控制，對 CK 等長
+MIPI DSI  PD0~PD9   RGB 並列  PD0~PD21   → 前 10 支完全重疊
+軟體切換切不掉電氣負載，必須用 10 顆 0Ω 隔離
+0Ω 焊盤距主幹 > 0.5mm 的話，MIPI 線上就留著一段 stub → 白做
+緩解：0Ω 貼著分支點放，MIPI 直通不串任何東西。詳見 002-display.md §1
+```
+
+**⑤ RGB 並列等長 —— HDMI 無畫面或花屏**
+
+```
+18 條資料（RGB666，非 RGB888）+ 4 控制，對 CK 等長
 pixel clock 若跑 1080p 約 148MHz，skew budget 約 ±80mm（比 DDR 寬鬆得多）
 真正的殺手是 SSO noise：24 條同時翻轉的地彈
 緩解：串聯阻尼電阻 22~33Ω、控制 slew rate、完整 GND 回流
 ```
 
-**⑤ Linux 跑不起來 —— 但這是軟體問題，可以慢慢調**
+**⑥ Linux 跑不起來 —— 但這是軟體問題，可以慢慢調**
 
 板子焊好之後，kernel / dts / driver 都能反覆改。**硬體錯了要重做，軟體錯了只要重編。** 這是這塊板相對安全的地方。
 
@@ -133,8 +150,14 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
 階段 0  規格與選型                  ← 目前在這
         [x] 介面清單定案
         [x] 成本估算
+        [x] datasheet 取得（v1.6 + User Manual v1.1/v1.3 + MangoPi MQ-R 原理圖）
+        [x] 封裝型式 → eLQFP128 14×14×1.4mm，EPAD = 唯一數位地
+        [x] 上電時序 → T1>2ms、T2>64ms，關機無限制
+        [x] 電源軌電壓 → 0.9V / 1.5V / 3.3V + 內建 LDOA 供 1.8V
+        [x] 熱阻 → θJA 20.36°C/W，不需散熱片
+        [ ] 封裝機構圖數字（pitch / b / L / D,E / **D3,E3**）—— p.78 有原廠 CAUTION
+        [ ] TCON 數量、MIPI lane rate、RGB pixel clock 上限
         [ ] 零件料號逐項查證（LCSC 即時價、庫存、Basic/Extended）
-        [ ] datasheet 讀完：封裝、上電時序、TCON 數量、時脈上限
 
 階段 1  原理圖
         [ ] T113-S3 符號建立（依 datasheet 分 bank）
@@ -146,7 +169,7 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
         [ ] footprint 逐一驗算 + 1:1 列印比對
         [ ] 層疊與阻抗線寬（用 JLCPCB 回算值）
         [ ] 差分對走線（13 對）
-        [ ] RGB 並列等長（28 條）
+        [ ] RGB666 並列等長（22 條）+ MIPI/RGB 分支 10 顆 0Ω（焊盤距主幹 ≤0.5mm）
         [ ] 鋪銅、DRC 三項歸零
 
 階段 3  出圖與下單
@@ -154,8 +177,8 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
         [ ] CPL 用 JLCPCB 官方五欄格式
         [ ] BOM 料號逐顆核對
         [ ] 零件方向在 Confirm Parts Placement 頁逐顆確認
-        [ ] 鋼網加購（$8，自焊必備）
-        [ ] PCBA 數量設 1 片（其餘自焊，見 006-assembly.md）
+        [ ] 鋼網**不**加購（部分貼裝用不到，見 006-assembly.md）
+        [ ] PCBA 數量設 3 片，BOM 只列 T113 / IT66121 / RTL8201F
         [ ] LCSC 零件訂單建立並與 JLCPCB 合併運費
         [ ] 主晶片備品數量確認（T113 ≥3、IT66121 ≥3）
 
@@ -176,12 +199,17 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
 比照上一塊板的標準：
 
 - [ ] T113-S3 / IT66121 / RTL8201F footprint 對照 datasheet 機構圖逐項核對，1:1 列印比對
+- [ ] **T113-S3 的 EPAD 用 datasheet §7.2 的「第二組」尺寸 D3/E3 = 5.72 mm REF**（p.78 CAUTION）
+- [ ] EPAD 下方 thermal via 陣列已放，且設為 **plugged**（否則錫會漏到背面，晶片浮起）
+- [ ] IT66121 的 land pattern 已取得（公開版 datasheet 只有 8 頁、無機構圖）
 - [ ] 電源上電時序對照 datasheet，寫成文件記錄
 - [ ] 分壓電阻算出的電壓與標稱值相符（用公式驗算，不靠標籤）
 - [ ] DRC violations / unconnected / schematic parity 三項歸零
 - [ ] 四層鋪銅完成，內層 GND 為完整一片
 - [ ] 13 對差分：阻抗控制已開、線寬照 JLCPCB 回算值、對內等長符合各自規格
-- [ ] RGB 28 條對 CK 等長，串聯阻尼電阻已放
+- [ ] RGB666 22 條對 CK 等長，串聯阻尼電阻已放
+- [ ] MIPI/RGB 分支的 10 顆 0Ω 焊盤距主幹 ≤0.5mm（不焊時 MIPI 線上無 stub）
+- [ ] 排針 20 條對外訊號全部有限流電阻，且全在 PG bank（SPI 除外）
 - [ ] BOM 料號逐顆核對（尤其電阻編碼，上次踩過 6200/6201 差十倍）
 - [ ] CPL 為 JLCPCB 官方五欄格式，座標與 kicad-cli 交叉比對
 - [ ] Gerber 內層檔名不含括號（上次因此被判成 2 層板）

@@ -1,20 +1,114 @@
 # 002 · 顯示介面：MIPI DSI 與 RGB→HDMI
 
+版本：v0.2 · 2026-09-18（查完 pin mux 表後重寫架構，v0.1 的假設是錯的）
+
+**專案優先序：MIPI DSI > RGB/HDMI。** 長期目標是 DSI layout 經驗，HDMI 是附帶。
+
 ---
 
-## 1. 架構
+## 1. 必須先講清楚的事實：MIPI 與 RGB 共用同一組實體接腳
+
+v0.1 寫「兩者共用同一組 TCON，dts 二選一」—— **不只是共用 TCON，是共用接腳。**
+
+`(DS Table 4-3 Pin Multiplexing, PD bank)`
+
+```
+PD0   LCD0-D2    LVDS0-V0P   DSI-D0P     ┐
+PD1   LCD0-D3    LVDS0-V0N   DSI-D0N     │
+PD2   LCD0-D4    LVDS0-V1P   DSI-D1P     │
+PD3   LCD0-D5    LVDS0-V1N   DSI-D1N     │
+PD4   LCD0-D6    LVDS0-V2P   DSI-CKP     ├─ MIPI 用這 10 支（5 對）
+PD5   LCD0-D7    LVDS0-V2N   DSI-CKN     │  RGB 也用這 10 支
+PD6   LCD0-D10   LVDS0-CKP   DSI-D2P     │
+PD7   LCD0-D11   LVDS0-CKN   DSI-D2N     │
+PD8   LCD0-D12   LVDS0-V3P   DSI-D3P     │
+PD9   LCD0-D13   LVDS0-V3N   DSI-D3N     ┘
+PD10  LCD0-D14   LVDS1-V0P   SPI1-CS     ┐
+ ...                                     ├─ 只有 RGB 用，不衝突
+PD21  LCD0-VSYNC TWI2-SDA    UART1-TX    ┘
+```
+
+```
+MIPI DSI   PD0 ~ PD9    10 支（4 lane + 1 clock = 5 對）
+RGB 並列   PD0 ~ PD21   22 支
+重疊區     PD0 ~ PD9    完全重疊
+```
+
+### 1.1 為什麼這是問題，而不只是「dts 二選一」
+
+如果兩組接頭都直接拉線到 PD0~PD9：
+
+```
+MIPI FPC 座       ┐
+                  ├─ 兩者的走線都永遠掛在同一支腳上
+IT66121 RGB 輸入  ┘
+```
+
+**軟體切換不能把電氣負載切掉。** 跑 MIPI 模式時，IT66121 的輸入電容（每支約 5 pF）
+加上到 IT66121 的走線，會變成掛在 1 Gbps 差分線上的 stub。
+
+而 §2.1 的規則已經寫得很清楚：**MIPI 不能有 stub。**
+
+反過來看則寬鬆得多：跑 RGB 模式時，MIPI FPC 座的走線是掛在 148 MHz 單端線上的 stub，
+短一點就沒事。**這個衝突是不對稱的 —— MIPI 受害，RGB 不受害。**
+
+### 1.2 解法：PD0~PD9 用 0Ω 隔離，MIPI 直通
+
+```
+SoC PD0~PD9  ═══════════════════════════════▶  MIPI FPC 座   （直通，阻抗控制）
+                   ║
+                   ╚═[0Ω × 10]══════════════▶  IT66121 低位輸入
+
+SoC PD10~PD21 ─────────────────────────────▶  IT66121        （不衝突，直接接）
+```
+
+```
+要跑 MIPI    0Ω 不焊  →  IT66121 輸入斷開，MIPI 線上乾淨
+要跑 HDMI    0Ω 焊上  →  RGB 全部接通
+```
+
+**IT66121 本體照樣上件**（交給 PCBA，QFN64 不手焊），只是輸入被 0Ω 斷開。
+切換要動烙鐵，但 0402 0Ω 拆焊很容易。
+
+⚠ 這不違反 §2.1「MIPI 不能加串聯電阻」的規則 ——
+**0Ω 不在 MIPI 路徑上，它在分支上。** MIPI 是直通，不經過任何電阻。
+
+### 1.3 ⚠ layout 關鍵規則：0Ω 必須貼著主幹
+
+不焊 0Ω 時，MIPI 線上剩下的 stub = 從主幹到 0Ω 第一個焊盤的距離。
+
+```
+MIPI HS 上升時間  ~200 ps
+FR4 傳播延遲      ~6.7 ps/mm
+臨界長度          ~200ps / 6.7ps/mm / 6 ≈ 5 mm
+
+規則：0Ω 焊盤邊緣距離主幹走線 ≤ 0.5 mm
+```
+
+放遠了就白做 —— stub 還在，只是換了個位置。
+
+### 1.4 IT66121 在 MIPI 模式要關掉
+
+0Ω 拆掉後 IT66121 的輸入浮接。**必須用 GPIO 控制它的 `SYSRSTN`（或電源），
+在 MIPI 模式時讓它保持 reset**，避免它亂驅動或耗電。
+
+```
+[ ] 原理圖上 IT66121 的 SYSRSTN 接一支 GPIO，不要直接上拉
+```
+
+---
+
+## 1.5 架構圖（修正後）
 
 ```
 T113-S3 Display Engine
         │
-      TCON  ⚠ 待確認是否只有一組
+      TCON
         │
-        ├──▶ MIPI DSI 4-lane ──▶ FPC 座 ──▶ 面板
-        │
-        └──▶ RGB 並列 24-bit ──▶ IT66121 ──▶ HDMI Type-A
+        ├──▶ PD0~PD9   ──┬──▶ MIPI DSI 4-lane ──▶ FPC 座 ──▶ 面板   ★ 優先
+        │                 └─[0Ω]──┐
+        └──▶ PD10~PD21 ───────────┴──▶ IT66121 ──▶ HDMI Type-A
 ```
-
-**若只有一組 TCON，兩條路徑在 dts 裡二選一。** 對練習板來說這不是缺點：分開測試更容易定位問題。兩組接頭都拉出來，想測哪個就切哪個。
 
 ---
 
@@ -90,7 +184,7 @@ IOVCC 1.8/3.3V   介面電壓
 
 ```
 drivers/gpu/drm/bridge/ite-it66121.c   ← mainline 就有
-LQFP64 封裝                            ← 腳位露在外面，好焊好驗
+QFN64 9×9mm + 底部 GND pad             ⚠ 非 LQFP，手焊高風險，交給 PCBA
 Allwinner 生態常用                      ← 有人踩過坑
 ```
 
@@ -98,9 +192,39 @@ LT8618SX 在 Linux 上通常要靠廠商 blob 或自己寫 driver。**第一塊�
 
 ### 3.2 RGB 並列走線
 
+### ⚠ T113-S3 的 RGB 最多只到 RGB666，沒有 RGB888
+
+`(DS Table 4-3 Pin Multiplexing, PD bank)`
+
 ```
-訊號數    24 資料 + HS + VS + DE + CK = 28 條單端
+LCD0-D2  ~ D7    PD0  ~ PD5    R[7:2]   6 bit
+LCD0-D10 ~ D15   PD6  ~ PD11   G[7:2]   6 bit
+LCD0-D18 ~ D23   PD12 ~ PD17   B[7:2]   6 bit
+LCD0-CLK         PD18
+LCD0-DE          PD19
+LCD0-HSYNC       PD20
+LCD0-VSYNC       PD21
+```
+
+**LCD0-D0 / D1 / D8 / D9 / D16 / D17 在 PD bank 上不存在。**
+`(DS §2.6.1 p.6 也只寫 "RGB666 and RGB565 with dither function")`
+MangoPi 原理圖自己的註記也是 `RGB666=PD0~PD21`。
+
+```
+v0.1 寫    24 資料 + 4 控制 = 28 條單端      ✗
+實際       18 資料 + 4 控制 = 22 條單端      ✓
+```
+
+**後果：HDMI 輸出的顏色深度是 RGB666（26 萬色），不是 RGB888（1670 萬色）。**
+漸層會有可見的 banding。IT66121 支援 RGB666 輸入，功能上沒問題，
+T113 的 DE 也有 dither 可以緩解。
+
+**這也是「MIPI 優先」的另一個理由 —— MIPI DSI 支援 RGB888，RGB 並列不支援。**
+
+```
+訊號數       18 資料 + HS + VS + DE + CK = 22 條單端
 pixel clock  1080p@60 約 148.5 MHz（⚠ 待確認 T113 與 IT66121 的上限）
+解析度上限   RGB 1920×1080@60  /  MIPI DSI 4-lane 1920×1200@60   (DS §2.6 p.6)
 ```
 
 **skew budget 比直覺寬鬆**：
@@ -123,7 +247,11 @@ GND 回流       走線下方必須是完整 GND 平面
 分組           資料線分成幾組，中間穿插 GND 走線
 ```
 
-⚠ 28 條線加上串聯電阻 = **28 顆 0402 電阻**，要預留擺放空間。
+⚠ 22 條線加上串聯電阻 = **22 顆 0402 電阻**，再加 §1.2 的 **10 顆 0Ω 隔離**，
+共 32 顆電阻要預留擺放空間。
+
+⚠ PD0~PD9 那 10 條的阻尼電阻要放在 **0Ω 之後、靠 IT66121 那側**，
+不能放在主幹上 —— 主幹是 MIPI 的路徑，不能串任何東西。
 
 ### 3.3 TMDS 差分
 
@@ -171,7 +299,7 @@ MIPI 還要對面板 timing、init sequence、lane 設定，變因多得多。
 [ ] MIPI 5 對阻抗 100Ω，對內等長 ±0.1mm，全程不跨分割
 [ ] MIPI 線上無串聯電阻、無 AC 耦合電容
 [ ] TMDS 4 對阻抗 100Ω，對內等長 ±0.15mm
-[ ] RGB 28 條對 CK 等長，串聯阻尼電阻已放且靠近驅動端
+[ ] RGB 22 條對 CK 等長，串聯阻尼電阻已放且靠近驅動端
 [ ] HDMI ESD 保護已放，電容 <1pF
 [ ] DDC 上拉到 5V
 [ ] IT66121 的 RGB 輸入時脈上限 ≥ 目標解析度所需
