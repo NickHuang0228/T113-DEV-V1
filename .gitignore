@@ -1,0 +1,34 @@
+# 大型參考文件不進版控，來源記在 docs/reference/README.md
+*.pdf
+*.PDF
+
+# KiCad
+*-backups/
+*.kicad_prl
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*.lck
+fp-info-cache
+~*.lck
+_autosave-*
+
+# KiCad 輸出（出圖時再產生）
+output/
+gerber/
+*.gbr
+*.drl
+*.gbrjob
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 編輯器與系統
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store
