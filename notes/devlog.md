@@ -572,3 +572,104 @@ RTL8201F   QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias      直接用
 
 真正要小心的只剩兩件:T113 的 EPAD 選錯組別,以及 RTL8201F 拿錯封裝章節。
 兩件都已寫進 008-footprint.md 的驗收清單。
+
+---
+
+## 2026-09-19 · 128 腳位表抽出來了，並且炸出三個新衝突
+
+### 先解決「Table 4-2 不可用」
+
+前面記的是「Table 4-2 Pin Characteristics，ball# 與 pin name 完全對不上，不可用」。
+**問題不在 datasheet，在抽取方法。**
+
+```
+pdftotext -layout / get_text()   依文字座標重建欄位  → 欄寬一變就跑位
+page.find_tables()               依繪製的線框切格子  → 欄位不會跑位
+```
+
+用 `find_tables()` 一次抽出 **128 列，無缺號、無重複**，而且與先前人工核的數字完全吻合：
+
+```
+I/O 72 + AI 17 + AO 8 + A I/O 4 + I,OD 1 = 102    ← 對上「I/O 102」
+Power 24（含 DDR 3）+ Ground 1 + NC 1 = 26         ← 對上「Power 21 + DDR 3 + GND 1 + NC 1」
+```
+
+產出 `tools/t113s3_pins.csv`（pin / name / type / reset / pull / drive / supply / group）。
+這張表是 KiCad 符號的直接輸入，也是之後所有腳位爭議的唯一真相來源。
+
+**規則升級**：原本是「定位靠文字，定案靠看圖」。現在中間多一層 ——
+**有線框的表格用 `find_tables()`，沒線框的才退回看圖。**
+
+### 炸出來的三個衝突
+
+拿這張表去對 007 的 bank 草案，三處對不上：
+
+**① PB0 / PB1 根本不存在**
+
+```
+GPIOB 只有 6 支：PB2 ~ PB7
+```
+
+007 §6.3 寫的「PB0~PB1 → UART0 → CH340N ⚠ 腳位待確認」——
+不是待確認，是**那兩支腳這個封裝沒引出來**。
+
+**② UART0 沒有獨立腳位 —— 而它是 bring-up 生命線**
+
+Table 4-3 裡 UART0 只有兩組 mux，兩組都撞人：
+
+```
+PE2 / PE3   ←→  RGMII-RXD1 / RGMII-TXCK (RMII)   撞乙太網路
+PF2 / PF4   ←→  SDC0-CLK / SDC0-D3              撞 microSD
+```
+
+而 **BROM 的 debug log 寫死走 UART0**，改不了。
+
+決定走 **PF2/PF4 + 2 顆 0Ω 分支到 CH340N**。關鍵理由是這兩個功能**在時間上不重疊**：
+
+```
+BROM 階段     PF2/PF4 = UART0   印開機 log      ← CH340N 收得到
+切到 SD 後    PF2/PF4 = SDC0    50MHz 時脈      ← CH340N 收到亂碼（正常）
+Linux 起來    console 改用 UART1（PG13/PG15）
+```
+
+0Ω 的作用是「SD 跑不穩時能一刀切開定位」，不是常態拆裝。
+**這是本專案第二次用 0Ω 隔離解 mux 衝突**（第一次是 PD0~PD9 的 MIPI/RGB）。
+
+不選 PE2/PE3：RMII 要 PE0~PE9 連續，抽兩條就廢，而乙太是 TFTP+NFS 開發循環的基礎。
+不把 SD 移到 SDC1(PG0~PG5)：BROM 一般不從 SDC1 開機，會同時失去「能開機」和「排針 6 支」。
+
+**③ PC4 / PC5 同時是 BOOT-SEL strap**
+
+```
+PC4   SPI0-MOSI   SDC2-D2   BOOT-SEL0
+PC5   SPI0-MISO   SDC2-D1   BOOT-SEL1
+```
+
+SPI NOR 的 MOSI/MISO 腳，同時決定 BROM 從哪裡開機。
+**這是「上電瞬間的電平」問題，不是訊號完整性問題** —— 量測要抓上電那一刻，不是穩態。
+原理圖階段必須確認 SPI NOR 的輸入阻抗與是否需要外加上下拉。
+
+### 順帶收掉一項：JTAG
+
+PF bank 給 SDC0 之後，PF0/PF1/PF3/PF5 的 JTAG 功能就沒了。
+對 Linux 板影響不大（UART + FEL 就夠，JTAG 還要額外 debugger）。
+
+**做法：那 4 支腳旁放測試點，需要時飛線。成本 $0，保留退路。**
+
+### 這一輪的模式
+
+三個衝突都是同一種形狀：**「我以為某個功能有自己的腳」，實際上它跟別人共用 mux。**
+
+前一輪推翻五個假設時的教訓是「合理 ≠ 查證過」。
+這一輪補上後半句：**查證的單位不是「這個功能存不存在」，是「這個功能佔用哪幾支實體腳、還有誰也要那幾支」。**
+
+datasheet 的 Features 頁會說「6 個 UART、3 個 SMHC、4 個 TWI」，
+但那是 **mux 選項的總數，不是能同時使用的數量**。
+
+### 下一步
+
+```
+[ ] 用 t113s3_pins.csv 產生 KiCad 符號（多 unit，依 bank 分頁）
+[ ] 確認 VCC-IO 供電的 23 支是哪些（目前 PB6+PC6+PF7=19，還有 4 支未歸位）
+[ ] 零件料號逐項查 LCSC（即時價、庫存、Extended 種類數 → 回頭重算 PCBA 費用）
+```
