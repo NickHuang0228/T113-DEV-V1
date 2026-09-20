@@ -1,6 +1,6 @@
 # 001 · 電源樹與上電時序
 
-版本：v0.4 · 2026-09-20（**IT66121 停產改用 ADV7511**：1.2V 軌取消，1.8V 軌改為外部 600mA LDO）
+版本：v0.5 · 2026-09-20（ADV7511 原廠 Table 1 已取得:**五個** 1.8V 域、3.3V 那條叫 MVdd）
 
 **資料來源**：`T113-S3_Datasheet_v1.6_20220303.pdf`，以下標註格式為 `(DS §5.3 p.45)`。
 交叉驗證對象：`MangoPi_MQ-R_sch_v1.6.pdf`（分壓值已驗算，見 §2.4）。
@@ -26,7 +26,7 @@
 | | VCC-TVOUT | CVBS 輸出 |
 | | LDO-IN | 內部 LDOA/B 的輸入（Max 3.6） |
 | **1.8 或 3.3 V** | VCC-PD / VCC-PE / VCC-PG | GPIO bank，**可選**（VCC-PE 另支援 2.8V） |
-| **1.8 V** | **ADV7511** DVDD / AVDD / PVDD / BGVDD | **HDMI 橋接晶片**，約 180 mA（見 §1.2） |
+| **1.8 V** | **ADV7511** DVdd / AVdd / PVdd / PLVdd / BGVdd | **HDMI 橋接晶片**，約 180 mA（見 §1.2） |
 | **5 V** | — | USB-A Host 直通（含限流） |
 
 > ⚠ v0.1 寫的 `VDD_CPU / VDD_SYS = 1.1V` 是錯的，datasheet Typ 是 **0.9 V**。
@@ -72,18 +72,26 @@ IP101GR   2.5 / 3.3 V
 v0.3 查出 IT66121 需要 1.2V，把電源域從 4 組改成 5 組。
 **v0.4 因為 IT66121 停產改用 ADV7511，那條 1.2V 軌又消失了** —— 但換來新的問題。
 
-`(ADV7511W Hardware User's Guide Rev.A, p.11 / p.41)`
+`(ADV7511 Hardware User's Guide Rev.D §4 Table 1, p.12-13 —— 表頭標示 ADV7511KSTZ)`
 
 ```
-DVDD      1.8V   數位核心與 IO
-AVDD      1.8V   TMDS 輸出類比
-PVDD      1.8V   PLL           ← 最敏感
-BGVDD     1.8V   band-gap
-DVDD_3V   3.3V
+1.8V   DVdd    HDMI 數位核心          雜訊上限  64 mV RMS
+       AVdd    HDMI 類比              見 §7.1（更嚴）
+       PVdd    HDMI PLL – 數位        雜訊上限  64 mV RMS
+       PLVdd   HDMI PLL – 類比        見 §7.1（更嚴）
+       BGVdd   band-gap               雜訊上限  64 mV RMS
+       範圍 1.71 / 1.80 / 1.90 V
 
-1.8V 功耗   325 mW  →  約 180 mA
-3.3V 功耗     1 mW
+3.3V   MVdd    範圍 3.15 / 3.30 / 3.45 V
+
+功耗   326 mW 總計（1.8V = 325 mW → 約 180 mA，3.3V = 1 mW）
+       條件 1080p / 36-bit；本板 RGB666 會更低，但照最壞情況設計
+待機   Power-Down L1 20 mA · L2 300 µA
 ```
+
+⚠ **是五個 1.8V 域不是四個。** v0.4 寫四個是抄 **ADV7511W**（64 腳版）的，
+KSTZ 多一個 **PLVdd**，而且 3.3V 那條叫 **MVdd** 不是 `DVDD_3V`。
+**同系列不同尾碼就是不同晶片 —— 這是本專案第五次踩同型的坑。**
 
 #### 1.8V 的帳重算
 
@@ -107,34 +115,36 @@ ADV7511                                                 約 180 mA
 現在那顆 XC6206 **容量不夠**，要換成貴 8 倍但足量的 AP2112K。
 **負載變了，元件選擇就要跟著重算 —— 不能因為上一版已經選好就沿用。**
 
-#### ADI 的額外要求：1.8V 要分成 3 組電源域
+#### 1.8V 要分組隔離
 
-`(同上 p.41 Figure 21)`
+五個 1.8V 域各有雜訊上限（DVdd / PVdd / BGVdd 各 64 mV RMS，AVdd / PLVdd 更嚴），
+**要分組並各自用磁珠或 LC 從幹線隔開**，兩支 PLL 電源（PVdd / PLVdd）最敏感。
 
 ```
-"It is recommended to combine the four 1.8 volt power domains of the ADV7511W
- into 3 separate PCB power domains ... An LC filter on the output ..."
-
-每支電源腳另接 0.1µF，盡量貼近腳位
-PVDD（PLL）最敏感
+每支電源腳 0.1µF，盡量貼近腳位
+[ ] 取 HW User's Guide §7.1 的去耦與分域建議（目前只有 Table 1 的雜訊上限數字）
 ```
 
 這是額外的 layout 工作量，要在 placement 階段就留位置給那幾組 LC。
 
 #### 視訊輸入腳的電平：3.3V 直接可用
 
-```
-D[35:0] / CLK / HSYNC / VSYNC / DE
-  "Supports typical CMOS logic levels from 1.8V up to 3.3V."   (p.17)
-```
-
-**§1.1 的 VCC-PD = 3.3V 不必推翻，22 條 RGB 線不需要電平轉換。**
+`(同上 Table 1, p.12 —— Data Inputs: Video, Audio and CEC_CLK)`
 
 ```
-[ ] 待核對：以上出處是 ADV7511W（165MHz 寬溫版）的硬體指南，
-     我們買的是 ADV7511KSTZ。同家族同腳位，但下單前要回 ADV7511 自己的
-     datasheet 核對電源與輸入電平。ADI 官網 PDF 擋 curl/WebFetch，
-     要從 DigiKey/Mouser 鏡像抓或手動下載。
+VIH   Min 1.35   Max 3.5   V
+VIL   Min -0.3   Max 0.7   V
+      Input Capacitance    Typ 1.0 / Max 1.5 pF
+```
+
+**VIH 上限 3.5V → 3.3V CMOS 直接驅動。§1.1 的 VCC-PD = 3.3V 不必推翻，
+22 條 RGB 線不需要電平轉換。**
+
+✅ 輸入電容 1.5 pF max（IT66121 約 5 pF）—— 掛在 MIPI 分支上的負載只有 1/3。
+
+```
+[ ] 原始 PDF 仍未存檔（ADI 封鎖自動下載）。數字來自 pdf.js 文字層抽取，
+     整理於 ../reference/peripherals/ADV7511KSTZ_extracted.md
 ```
 
 ### 1.3 RTL8201F 不需要額外電源軌
@@ -385,8 +395,9 @@ PVDD（PLL）最敏感
 ```
 
 ```
-[ ] 待確認：ADV7511 是否也有類似 IT66121 REXT 的 TMDS 擺幅設定電阻
-             → 回 datasheet 的 Pin Description 確認
+TMDS Differential Swing  800 / 1000 / 1200 mV   (Table 1, p.13)
+[ ] 待確認：ADV7511 的 TMDS 擺幅是否靠外部電阻設定（IT66121 用 REXT 5.6kΩ）
+             → 需要 HW Guide p.19-20 的完整腳位表
 ```
 
 **注意 DC bias**：上一塊板學到的教訓 —— MLCC 在偏壓下容值會掉。
@@ -578,7 +589,7 @@ B. 背面 via 補焊
 [ ] MangoPi 的 RESET 腳實際有無電容、多大 → 決定要不要加 reset supervisor
 [x] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 還是 3.3V → **三者全選 3.3V**（見 §1.1）
 [x] 1.8V LDO 選型 → **AP2112K-1.8TRG1 (C176944, 600mA)**，XC6206 的 200mA 不夠
-[ ] ADV7511 的四個 1.8V 域如何分成 3 組（對照 HW Guide Figure 21）
+[ ] ADV7511 的五個 1.8V 域如何分組隔離（對照 HW Guide §7.1）
 [ ] VCC-PD = 3.3V 時 MIPI 是否正常 —— 找有接 DSI 面板的參考設計核對
 [ ] Table 5-2 / 5-3 的數字回 p.45-48 原頁目視核對（pdftotext 欄位有錯位）
 ```
@@ -591,7 +602,7 @@ B. 背面 via 補焊
 [ ] 上電前先量各軌對地電阻，確認沒有短路
 [ ] 3.3V / 1.5V / 0.9V 三軌電壓，誤差 <±3%
 [ ] 若用內部 LDOA，量 LDOA-OUT (pin 28) 是否為 1.8V
-[ ] ADV7511 的 1.8V 軌電壓與漣波（PVDD 最敏感，對照 HW Guide Figure 22 的雜訊上限曲線）
+[ ] ADV7511 的 1.8V 軌電壓與漣波：DVdd/PVdd/BGVdd 各 <64 mV RMS，AVdd/PLVdd 更嚴
 [ ] 四通道示波器抓上電時序：3.3V → 0.9V 間隔 > 2 ms，末軌 → RESET 釋放 > 64 ms
 [ ] 各軌漣波（AC 耦合，20MHz 頻寬限制），目標 <50 mV pp
 [ ] 總電流（待機 / 全速 / 插 USB 裝置）

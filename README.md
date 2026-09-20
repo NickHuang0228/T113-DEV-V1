@@ -85,7 +85,7 @@ PCB      4 層 · 阻抗控制 · 100×100mm 以內
 [x] 規格書
 [x] datasheet 查證（封裝 / 電源 / 顯示鏈路）
 [x] BOM 料況查證 —— IT66121 停產，橋接改用 **ADV7511**（見 009-bom.md）
-[!] ADV7511 機構圖與 AC timing 待取得 —— 進 layout 前的阻塞項
+[x] ADV7511 原廠規格已取得(無 EPAD、tVSU/tVHLD、五個 1.8V 域)
 [ ] 原理圖
 [ ] PCB layout
 [ ] 出圖驗證

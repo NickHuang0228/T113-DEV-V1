@@ -1,6 +1,6 @@
 # 008 · Footprint 驗算
 
-版本：v0.3 · 2026-09-20（**IT66121 停產改用 ADV7511**：§4 作廢，新增 §4A 待辦）
+版本：v0.4 · 2026-09-20（ADV7511 機構圖數字已取得；**它沒有 EPAD**，先前寫「含 EPAD」是誤用 W 版資料）
 
 **這是這塊板唯一「錯了整批報廢、且無法補救」的項目**（ROADMAP §3.2 風險 ①）。
 所有數字一律以 datasheet 機構圖為準，不信任任何二手來源。
@@ -200,55 +200,90 @@ KiCad 對應件為 `QFN-64-1EP_9x9mm_P0.5mm_EP3.8x3.8mm_ThermalVias`。
 
 ---
 
-## 4A. ADV7511KSTZ（LQFP-100）—— ⚠ 機構圖尚未取得
+## 4A. ADV7511KSTZ（LQFP-100）
 
-`LCSC C179459 · Analog Devices · LQFP-100(14×14) · 含 EPAD`
+`LCSC C179459 · Analog Devices · ST-100 · JEDEC MS-026-BED`
 
-### 目前只知道的事
+**來源**：`ADV7511 Hardware User's Guide Rev.D §5.1 p.21 Figure 7`
+完整抽取見 [../reference/peripherals/ADV7511KSTZ_extracted.md](../reference/peripherals/ADV7511KSTZ_extracted.md)
+
+### ⚠ 先更正一個錯誤：它**沒有** Exposed Pad
+
+v0.3 寫「LQFP-100 14×14 **含 EPAD**」是錯的 —— 那是拿 **ADV7511W** 的資料套上來的。
+
+| | ADV7511**KSTZ**（本專案） | ADV7511**W**BSWZ |
+|---|---|---|
+| 封裝 | **100-lead LQFP** | 64-lead **LQFP_EP** |
+| 代號 | **ST-100** | SW-64-2 |
+| JEDEC | **MS-026-BED** | MS-026-BCD-HD |
+| 本體 | 14 × 14 | 10 × 10 |
+| EPAD | **無** | 有，5.00 SQ |
+| 視訊輸入 | D[35:0] | D[23:0] |
+| LCSC | C179459 有貨 | 無此料 |
+
+分辨依據：Figure 7 的標題是 `100-lead Low-Profile Quad Flat Pack [LQFP]`（不是 `[LQFP_EP]`），
+機構圖**沒有 D2/E2 欄位**，而 W 版的機構圖明確列著 `5.10 / 5.00 SQ / 4.90` 的 EXPOSED PAD。
+p.18 的腳位圖也顯示 **GND 是一般接腳，有多支**。
+
+> **這是本專案第五次踩「拿欄位字面值／鄰近型號當實際幾何」。**
+> 前四次是 J1 custom pad、ESP32 模組自轉 270°、T113 的六組 EPAD、RTL8201F 的三種封裝章節。
+> 這次的變形是 **料號尾碼差一個字母就是不同封裝** —— 和 RTL8201F/FL/FN 完全同型。
+
+### 機構圖數字
 
 ```
-封裝     100-lead LQFP，本體 14 × 14 mm      (ADI 產品頁 / LCSC 規格欄)
-EPAD     有，但尺寸未知                      (ADV7511W HW Guide 提到 exposed pad 須接地)
-pitch    推定 0.50 mm（14mm 本體 / 100 腳的標準值）  ⚠ 未驗證
+本體 D1/E1      13.80  /  14.00 SQ  /  14.20
+含腳 D/E        15.80  /  16.00 SQ  /  16.20
+pitch e         0.50 BSC
+腳寬 b          0.17   /  0.22      /  0.27
+腳長 L          0.45   /  0.60      /  0.75
+總高 A          1.60 MAX
+本體厚 A2       1.35   /  1.40      /  1.45
+站立高 A1       0.05   /  0.15
+共面度          0.08
 ```
 
-### ⚠ 為什麼這一節是空的
-
-**ADI 官網的 PDF 直連會擋 `curl` 與 `WebFetch`**（ECONNRESET／逾時），
-package outline 與 datasheet 都抓不到。
-
-而專案規則是明確的 —— ROADMAP 風險 ①：
-
-> footprint 一律回到原廠機構圖驗算，**不信任任何二手來源**。
-
-所以這裡**刻意不填**從產品頁或經銷商規格欄推來的數字。
-T113-S3 的 EPAD 就是靠讀原始機構圖才躲掉「六組尺寸選錯」的坑，
-ADV7511 沒有理由用比較鬆的標準。
-
-### 待辦
+### 與 T113-S3 是同一個 JEDEC 家族
 
 ```
-[ ] 取得 ADV7511（非 W 版）datasheet —— 手動下載或從 DigiKey / Mouser 鏡像抓
-     放進 docs/reference/peripherals/
-[ ] 取得 ADI 的 package outline（ADV7511KSTZ 的封裝代號，ST-100-x 之類）
-[ ] 抄出：D/E（含腳）· D1/E1（本體）· e（pitch）· b · L · A · 共面度 · JEDEC 編號
-[ ] ⚠ 特別確認 EPAD 尺寸,以及是否像 T113 那樣有多組候選
-[ ] 比對 KiCad 的 LQFP-100 標準件是否對得上（候選：LQFP-100_14x14mm_P0.5mm）
-     對得上 → 沿用 + 自加 EPAD（與 T113-S3 同一套做法）
-     對不上 → 自建
+T113-S3    eLQFP128  MS-026-BEE  本體 14.00  含腳 16.00  pitch 0.40  + EPAD 5.72
+ADV7511    LQFP-100  MS-026-BED  本體 14.00  含腳 16.00  pitch 0.50  無 EPAD
+```
+
+**兩顆的本體與含腳尺寸完全相同，只差 pitch 與 EPAD。**
+placement 佔位一樣按 **16.8mm** 抓（含焊盤外緣）。
+
+### KiCad 對應件
+
+```
+候選：LQFP-100_14x14mm_P0.5mm
+  body 14mm · pitch 0.50 · 100 腳 · 本體厚 1.40 —— 四項與機構圖相符
+  ⚠ KiCad 該件的 descr 是否標 MS-026-BED 要開檔確認
+  ⚠ 沒有 EPAD → 不需要像 T113 那樣自加，直接用標準件
+```
+
+**→ 這顆不用自建 footprint。** 全板需要自建的仍然只有 T113-S3 一顆。
+
+### ⚠ 仍未完成的一步
+
+```
+[ ] 取得原始 PDF 目視核對 Figure 7 的「圖形」
+     目前數字來自 pdf.js 文字層抽取,ADI 封鎖了 PDF 的自動存檔
+     專案規則「定位靠文字,定案靠看圖」—— 這裡只完成了前半
+[ ] 開 KiCad 的 LQFP-100_14x14mm_P0.5mm 核對焊盤尺寸與 b/L 的相容性
 [ ] 1:1 列印比對實體零件
 ```
 
 ### 換料對 placement 的連帶影響
 
 ```
-IT66121   QFN-64   9 × 9 mm        （含腳約 9mm）
-ADV7511   LQFP-100 14 × 14 mm      （含腳會更大，推定 16mm 級）
+IT66121   QFN-64   本體 9 × 9    含腳約 9mm
+ADV7511   LQFP-100 本體 14 × 14  含腳 16.00（機構圖實值）
 ```
 
 **橋接晶片的佔位從 9mm 級跳到 16mm 級，和 T113-S3 一樣大。**
-100×100mm 上要塞兩顆 16mm 見方的晶片 —— placement 草圖要重畫，
-見 [005-stackup.md](005-stackup.md) §配置。
+100×100mm 上要塞兩顆 16.8mm 見方的佔位 —— placement 草圖要重畫，
+見 [005-stackup.md](005-stackup.md)。
 
 **直接用，不必自建。**
 
@@ -306,7 +341,7 @@ QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias
 [ ] Thermal via 5×5、0.3mm、間距 1.2mm，設為 plugged/tented
 [ ] placement 佔位按 16.8mm（不是 14mm）
 [ ] 1:1 列印，把實體零件壓上去比對
-[ ] ADV7511 footprint 依原廠機構圖建立（見 §4A —— **機構圖尚未取得，這是阻塞項**）
+[ ] ADV7511 用 `LQFP-100_14x14mm_P0.5mm`（MS-026-BED，**無 EPAD，不需自建**）（見 §4A）
 [ ] RTL8201F 用 `QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias`（見 §5）
     ⚠ 確認用的是 datasheet §10.1 QFN-32，不是 §10.2 LQFP-48 或 §10.3 QFN-48
 ```
@@ -318,14 +353,23 @@ QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias
 | 元件 | 封裝 | 本體 | pitch | EPAD | KiCad 標準件 |
 |---|---|---|---|---|---|
 | T113-S3 | eLQFP128 | 14×14（含腳 16×16） | 0.40 | **5.72×5.72** | `LQFP-128_14x14mm_P0.4mm` + **自加 EPAD** |
-| **ADV7511KSTZ** | LQFP-100 | 14×14 | ⚠ 未驗證 | ⚠ **未知** | ⚠ 待取得機構圖（見 §4A） |
+| **ADV7511KSTZ** | LQFP-100 | 14×14（含腳 16×16） | 0.50 | **無** | `LQFP-100_14x14mm_P0.5mm`（MS-026-BED） |
 | RTL8201F | QFN-32 | 5×5 | 0.50 | 3.35×3.35 | `QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias` |
 
-**三顆全部有底部 EPAD，全部交給 JLCPCB 貼裝**（見 [006-assembly.md](006-assembly.md)）。
+### ⚠ EPAD 的狀況變了
 
-⚠ **v0.3 的退步**：v0.2 的結論是「只有 T113-S3 要自建 footprint，風險比預期低很多」。
-換掉 IT66121 之後，**ADV7511 的機構圖還沒拿到，那條結論暫時收回。**
-RTL8201F 不受影響。
+```
+T113-S3    有 EPAD（5.72×5.72，唯一的數位地）  → 必須 PCBA
+ADV7511    無 EPAD                             → 可手焊、可目視檢查
+RTL8201F   有 EPAD（3.35×3.35）                → 建議 PCBA
+```
+
+**換掉 IT66121 之後，三顆不再是「全部有 EPAD」。**
+ADV7511 是 0.5mm pitch 的有腳封裝，難度等同上一塊板焊過的 LQFP ——
+**它從「必須交給 PCBA」變成「可以自己焊」**，見 [006-assembly.md](006-assembly.md)。
+
+v0.2 的結論「只有 T113-S3 需要自建 footprint」**仍然成立**，
+而且比原本更好：ADV7511 連 EPAD 都不用自己加。
 
 ---
 

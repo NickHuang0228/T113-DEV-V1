@@ -72,7 +72,7 @@ DS 系統方塊圖, p.20
 | 輸出 | 規格 | 元件 | 差分對 |
 |---|---|---|---|
 | MIPI DSI | 4 lane + clock，1920×1200@60 | FPC 座 0.5mm | **5 對** |
-| HDMI | RGB666 並列 → HDMI 1.4，1920×1080@60 | **ADV7511**（LQFP-100 14×14 + EPAD） | **4 對 TMDS** |
+| HDMI | RGB666 並列 → HDMI 1.4，1920×1080@60 | **ADV7511KSTZ**（LQFP-100 14×14，**無 EPAD**） | **4 對 TMDS** |
 
 **⚠ 兩者共用同一組實體接腳 PD0~PD9，不只是共用 TCON。** `(DS Table 4-3 Pin Multiplexing)`
 
@@ -327,7 +327,8 @@ PCB 最低量就是 5 片，**PCBA 貼幾片自己選**，剩下的當裸板寄�
 **改採最右欄「部分貼裝」。** v0.1 原本選中間那欄，查完 datasheet 後改掉，兩個理由：
 
 **① T113-S3 的 EPAD 是唯一的數位地，不焊就不會動，而且焊得好不好看不見。**
-ADV7511 是 LQFP-100 + EPAD、RTL8201F 是 QFN32 —— 三顆都有 EPAD，都是手焊高風險件。
+RTL8201F 是 QFN32 有 EPAD。**ADV7511 無 EPAD、0.5mm pitch 有腳，其實可以自己焊** ——
+交給 PCBA 是成本考量不是難度，見 006-assembly.md。
 把「不可觀測的焊點」外包，「可觀測的」留給自己，跟當初選 QFP 不選 BGA 是同一個判斷標準。
 
 **② 部分貼裝反而更便宜。** JLCPCB 的 PCBA 費用幾乎全在 **Extended part 上料費 $3.07/種**，
@@ -398,7 +399,7 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [x] T113-S3 上電時序 → T1 > 2ms、T2 > 64ms，關機無限制 `(DS §5.12 p.73-74)`
 - [x] 熱阻 θJA = 20.36 °C/W、Tj max = 110 °C → 不需散熱片 `(DS §6 p.76)`
 - [x] EPAD (pin 129) 是唯一數位地 → 必焊，交給 PCBA `(DS §4.1 p.23)`
-- [x] HDMI 橋接 → **ADV7511KSTZ**，LQFP-100 14×14 + EPAD（IT66121 停產，見 009-bom.md）
+- [x] HDMI 橋接 → **ADV7511KSTZ**，LQFP-100 14×14 **無 EPAD**、ST-100、MS-026-BED
 - [x] MIPI 與 RGB 共用 PD0~PD9 實體接腳 → 需 0Ω 隔離 `(DS Table 4-3)`
 - [x] **本板選 RGB666 → 22 條**（晶片支援 RGB888，需另借 PB2~PB7，本板不借）
       `(UM Table 5-2 p.399 / DS Table 4-3 p.30)`，理由見 007-pinmap.md §6.3
@@ -409,8 +410,9 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
       ADV7511 只到 165 MHz → **瓶頸在橋接晶片**，1080p60 的 148.5 MHz 兩邊都過
 - [x] **RGB666 腳位對應**：PD0~PD5 = B[5:0]、PD6~PD11 = G[5:0]、PD12~PD17 = R[5:0]
       ⚠ 002-display.md v0.2 把 R/B 標反，v0.3 已更正
-- [x] **ADV7511 需要 1.8V + 3.3V**，1.8V 約 180mA `(ADV7511W HW Guide p.11)`
-- [x] **ADV7511 視訊輸入支援 1.8~3.3V CMOS** → VCC-PD = 3.3V 不受影響 `(同上 p.17)`
+- [x] **ADV7511 需要 1.8V ×5 域 + 3.3V(MVdd)**，1.8V 約 180mA `(HW Guide Table 1, p.12)`
+- [x] **ADV7511 輸入 VIH 1.35~3.5V** → VCC-PD = 3.3V 不受影響；輸入電容 1.5pF max `(同上)`
+- [x] **ADV7511 視訊輸入 AC**：tVSU 1.0ns / tVHLD 0.7ns / 輸入時脈 max 165MHz `(同上 p.13)`
 - [x] **RTL8201F 只需 3.3V**（核心 1.1V 由內建 LDO 產生，且不可外供）`(RTL DS §8.8 p.38)`
 
 **未確認**
@@ -427,9 +429,12 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [ ] MIPI D-PHY 的 4-lane 電流（電源軌已推定為 VCC-LVDS，見 001-power.md §2.2.2）
 - [ ] VDD18-DRAM (pin 50) 接內建 LDOA 還是外部 1.8V
 - [ ] ADV7511 的 RESET# 要接 GPIO（MIPI 模式時保持 reset）
-- [ ] ★ **取得 ADV7511 機構圖與 Video Input AC Timing** —— 目前的阻塞項
+- [ ] 取得 HW Guide p.19-20 的完整腳位表（D[35:24] 處置、TMDS 擺幅設定電阻）
 - [x] 1.8V LDO 選型 → **AP2112K-1.8TRG1 (C176944, 600mA, $0.17)**；XC6206 的 200mA 不夠
-- [ ] ⚠ **ADV7511 封裝機構圖未取得**（ADI 官網 PDF 擋 curl/WebFetch，要手動下載）
+- [x] **ADV7511 機構圖數字已取得** `(HW Guide §5.1 p.21 Figure 7)`
+      本體 14.00 SQ · 含腳 16.00 SQ · pitch 0.50 BSC · b 0.22 · L 0.60 · **無 EPAD**
+      → KiCad `LQFP-100_14x14mm_P0.5mm` 可直接用，不需自建
+- [ ] ⚠ 原始 PDF 檔仍未存檔（ADI 封鎖自動下載），數字見 reference/peripherals/ADV7511KSTZ_extracted.md
 - [x] RTL8201F 封裝機構圖 → QFN-32 5×5，pitch 0.5，EPAD 3.35×3.35 `(RTL DS §10.1, p.55, JEDEC MO-220)`
 - [x] VCC-PD / VCC-PE / VCC-PG → **全部 3.3V**（見 001-power.md §1.1）
 - [ ] RY1303（三路 DC-DC）的 LCSC 料況 → 決定用三路或分離式 ×3

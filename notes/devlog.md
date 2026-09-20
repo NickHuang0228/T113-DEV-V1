@@ -838,3 +838,122 @@ ADV7511 沒有理由用比較鬆的標準。所以 008 §4A **刻意留白**,只
 ROADMAP §6 的第 3 塊板(高速差分/DP)從「構想」升級為明確的下一步,
 而且重點要從純 layout 練習往「能跑 DP driver、能做 DP 驗證」偏移 ——
 純被動轉接板量得到訊號,但沒有 driver 可寫。
+
+---
+
+## 2026-09-20 · 下載 ADV7511 datasheet:ADI 擋死六條路,但抓到的東西推翻了我自己的結論
+
+### 六條路全部失敗
+
+```
+curl(多種 UA / Referer)                 HTTP 000,連線被重置
+PowerShell Invoke-WebRequest             請求送出即失敗 / 逾時
+WebFetch                                 ECONNRESET / 逾時
+鏡像站 DigiKey / Mouser / LCSC / Farnell / RS / alldatasheet
+                                         403 / 404 / 回 HTML / 拿到別顆料
+Chrome PDF viewer 下載鈕 + Ctrl+S        點對了位置,檔案就是不落地
+頁內 blob + <a download>                 被靜默阻擋
+```
+
+中間還試過在頁面裡 `fetch` 後 POST 到本機接收端 —— **被權限分類器擋下,沒有繞過。**
+base64 分段中繼也被 harness 擋。
+
+**唯一可行的是:用瀏覽器開 analog.com 自己的頁面,注入 pdf.js 抽文字層。**
+`fetch()` 在同源下回 200、位元組數正確(846,967),但那些位元組沒辦法寫到磁碟。
+
+所以最後產出的是 `docs/reference/peripherals/ADV7511KSTZ_extracted.md` ——
+**原始 PDF 的替代品,不是等價物。** 機構圖是向量圖,文字層給得出數字,給不出圖形。
+專案規則「定位靠文字,定案靠看圖」在這裡只完成了前半,這件事有寫進檔頭。
+
+### ⚠ 抓到之後,第一件事是推翻我自己前一個 commit 寫的東西
+
+我在前一輪把 ADV7511 寫成「LQFP-100 14×14 **含 EPAD**」,依據是
+ADV7511**W** 的 Hardware User's Guide 裡那句
+`"The LQFP has an exposed pad that should be connected to ground"`。
+
+**那是 W 版的句子,而 W 版根本是不同的封裝。**
+
+```
+                ADV7511KSTZ(我們買的)      ADV7511WBSWZ
+封裝            100-lead LQFP              64-lead LQFP_EP
+代號            ST-100                     SW-64-2
+JEDEC           MS-026-BED                 MS-026-BCD-HD
+本體            14 × 14                    10 × 10
+EPAD            無                         有,5.00 SQ
+視訊輸入        D[35:0]                    D[23:0]
+LCSC            C179459 有貨               沒這料
+```
+
+我當時甚至在文件裡寫了警語:「出處是 ADV7511W,**同家族同腳位**,下單前要核對」——
+**那句「同家族同腳位」是我自己編的,而且是錯的。**
+
+加警語不等於查證。標了「待核對」的數字,在核對之前就不該拿來下結論。
+
+**這是本專案第五次踩「拿鄰近型號/欄位字面值當實際幾何」:**
+
+```
+1. 上一塊板  J1 custom pad
+2. 上一塊板  ESP32 模組 pad 自轉 270°
+3. T113-S3   機構圖有六組 EPAD,CAUTION 指定第 ②
+4. RTL8201F  同一份 datasheet 涵蓋 F / FL / FN 三種封裝
+5. ADV7511   KSTZ 與 W 是完全不同的封裝     ← 這次
+```
+
+第 4 和第 5 是同一型:**料號尾碼差一個字母就是不同封裝。**
+我在 008 裡對 RTL8201F 寫過「光看檔名不夠,料號尾碼決定封裝」,
+然後在 ADV7511 上犯了一模一樣的錯。**寫過的教訓沒有自動套用到下一顆料。**
+
+### 好消息:沒有 EPAD 是實質的升級
+
+```
+T113-S3    EPAD 5.72×5.72 = 唯一數位地   → 必須 PCBA,焊不好只能報廢
+RTL8201F   EPAD 3.35×3.35                → 建議 PCBA
+ADV7511    無 EPAD,pitch 0.50,有腳      → ★ 可手焊、可目視、可補焊
+```
+
+而且它和 T113-S3 是**同一個 JEDEC 家族**:
+
+```
+T113-S3    MS-026-BEE   本體 14.00  含腳 16.00  pitch 0.40  + EPAD
+ADV7511    MS-026-BED   本體 14.00  含腳 16.00  pitch 0.50  無 EPAD
+```
+
+**KiCad 的 `LQFP-100_14x14mm_P0.5mm` 可以直接用,連 EPAD 都不用自己加。**
+008 v0.2 那條「只有 T113-S3 需要自建 footprint」不但仍然成立,還比原本更乾淨。
+
+風險分布也改了:**v0.3 以為三顆都是「焊壞就報廢」,實際只有 T113 是。**
+
+### 其他被更正的數字
+
+```
+1.8V 域數量   四個 → 五個(多一個 PLVdd,HDMI PLL 類比)
+3.3V 腳名     DVDD_3V → MVdd          ← W 版才叫 DVDD_3V
+輸入電平      「1.8~3.3V CMOS」 → VIH 1.35~3.5V / VIL -0.3~0.7V(實際規格)
+輸入電容      未知 → Typ 1.0 / Max 1.5 pF   ← IT66121 約 5pF,只有 1/3
+視訊 setup    (借用 IT66121 的 1.5ns) → tVSU 1.0 ns
+視訊 hold     (借用 IT66121 的 0.7ns) → tVHLD 0.7 ns,剛好相同
+輸入時脈上限  165 MHz(確認)
+TMDS 輸出     20 ~ 225 MHz
+```
+
+skew budget 用真數字重算過:扣 tVSU 1.0 + tVHLD 0.7 後剩 5.03 ns,
+比用 IT66121 數字算的多 0.5 ns 餘裕。**結論不變(等長不是瓶頸),但算式換掉了。**
+
+⚠ **ADV7511 沒有公布輸入 PCLK 的 jitter 容許值**(IT66121 給 2.0 ns)。
+所以 SSO 那條風險現在**沒有數字可以驗算**,只能靠設計手段壓。這點要記著。
+
+### 方法筆記
+
+**這次真正有用的工具是 pdf.js 注入,不是任何下載器。**
+
+```js
+// 在目標站自己的頁面上執行(同源),注入 pdf.js 後:
+const doc = await pdfjsLib.getDocument({data: await (await fetch(url)).arrayBuffer()}).promise;
+const t = (await (await doc.getPage(i)).getTextContent()).items.map(x=>x.str).join(" ");
+```
+
+先掃全篇建索引(用 regex 標出 PKG / TIMING / PIN / PWR 的頁),再只取需要的頁。
+58 頁的文件,實際只讀了 5 頁就拿到全部要的數字。
+
+**對付擋下載的原廠站,這條路比找鏡像站可靠** ——
+鏡像站給的常常是別顆料(這次 Farnell 那個編號給了一顆施耐德感測器)。

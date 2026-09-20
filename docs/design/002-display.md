@@ -1,6 +1,6 @@
 # 002 · 顯示介面：MIPI DSI 與 RGB→HDMI
 
-版本：v0.4 · 2026-09-20（**IT66121 停產,橋接晶片改為 ADV7511**;判準從「driver 最省事」改為「driver 工作本身就是練習目標」）
+版本：v0.5 · 2026-09-20（取得 ADV7511 原廠規格:**無 EPAD**、輸入電容 1.5pF、tVSU/tVHLD 已重算）
 
 **專案優先序：MIPI DSI > RGB/HDMI。** 長期目標是 DSI layout 經驗，HDMI 是附帶。
 
@@ -72,8 +72,12 @@ ADV7511 RGB 輸入  ┘
 加上到 ADV7511 的走線，會變成掛在 1 Gbps 差分線上的 stub。
 
 ```
-[ ] 待確認：ADV7511 視訊輸入腳的輸入電容（IT66121 是每支約 5 pF）
+ADV7511 Input Capacitance   Typ 1.0 pF   Max 1.5 pF   (HW Guide Table 1, p.12)
+IT66121（原方案）            約 5 pF
 ```
+
+✅ **換料的意外好處：輸入電容只有原本的 1/3。** 掛在 MIPI 分支上的負載小得多。
+但 §1.3 的「0Ω 貼著主幹」規則**不因此放寬** —— stub 長度的問題來自走線本身，不是電容。
 
 而 §2.1 的規則已經寫得很清楚：**MIPI 不能有 stub。**
 
@@ -95,7 +99,8 @@ SoC PD10~PD21 ──────────────────────
 要跑 HDMI    0Ω 焊上  →  RGB 全部接通
 ```
 
-**ADV7511 本體照樣上件**（LQFP-100 有腳但底部仍有 EPAD，交給 PCBA），只是輸入被 0Ω 斷開。
+**ADV7511 本體照樣上件**，只是輸入被 0Ω 斷開。
+（ADV7511KSTZ **沒有 EPAD**，是可手焊的 0.5mm pitch 有腳封裝 —— 見 008-footprint.md §4A）
 切換要動烙鐵，但 0402 0Ω 拆焊很容易。
 
 ⚠ 這不違反 §2.1「MIPI 不能加串聯電阻」的規則 ——
@@ -401,33 +406,40 @@ PLL_VIDEO0(4X) 預設 1188 MHz   (UM §3.3.6.4 p.76)
 ⚠ **Table 5-18 沒有給 LCD 輸出的 setup/hold 或 Tco**，只有 cycle time 與時序常數關係。
 所以 T113 側的輸出 skew 仍是未知數 —— 下面的 budget 計算要保留餘量。
 
-### ⚠ 橋接晶片側的 AC 規格要重查
+### ✅ ADV7511 的視訊輸入 AC 規格（已取得）
 
-下面這組是 **IT66121** 的數字 `(IT66121 DS p.2 / p.17)`，**換成 ADV7511 後必須重新取得**：
-
-```
-Fpixel   單邊緣取樣   25 ~ 165 MHz
-TS       setup        1.5 ns min
-TH       hold         0.7 ns min
-TPJ      PCLK jitter  2.0 ns max
-TPDUTY   工作週期      40% ~ 60%
-```
+`(ADV7511 HW User's Guide Rev.D Table 1, p.13 —— 表頭標示 ADV7511KSTZ)`
 
 ```
-[ ] 取得 ADV7511 datasheet 的 Video Input AC Timing：
-     tSU / tHD / PCLK jitter 容許 / duty cycle
-     → 下面的 skew budget 要用 ADV7511 的數字重算一次
+Input Video Clock Frequency          Max 165    MHz
+Input Video Data Setup   tVSU        Min 1.0    ns
+Input Video Data Hold    tVHLD       Min 0.7    ns
+
+TMDS Output Clock Frequency          20 ~ 225   MHz
+TMDS Output Clock Duty Cycle         48 ~ 52    %
+TMDS Differential Swing              800 / 1000 / 1200 mV
+VSYNC/HSYNC Delay from DE Falling    1 UI
 ```
 
-⚠ **ADI 官網的 PDF 直連會擋 curl 與 WebFetch**（ECONNRESET／逾時），
-要從 DigiKey、Mouser 等鏡像抓，或手動下載放進 `docs/reference/peripherals/`。
+對照原方案：
 
-### skew budget（⚠ 以下用 IT66121 數字算，待換 ADV7511 數字重算）
+```
+              tSU      tHD      備註
+IT66121       1.5 ns   0.7 ns   另有 TPJ 2.0 ns 的 jitter 上限
+ADV7511       1.0 ns   0.7 ns   ⚠ datasheet 未給輸入時脈的 jitter 容許值
+```
+
+**ADV7511 的 setup 比 IT66121 寬鬆 0.5 ns，hold 相同。**
+
+⚠ **ADV7511 沒有公布輸入 PCLK 的 jitter 容許值**（IT66121 給 2.0 ns）。
+這一項無法直接比較 —— SSO 的影響仍要當成主要風險看待。
+
+### skew budget（用 ADV7511 的真實數字）
 
 ```
 148.5 MHz → Tpixel = 6.734 ns
-扣 TS 1.5 ns + TH 0.7 ns                 → 剩 4.53 ns
-給 T113 輸出 skew + 時脈 jitter 留 3.5 ns（保守，因為 DS 沒給 Tco）
+扣 tVSU 1.0 ns + tVHLD 0.7 ns            → 剩 5.03 ns
+給 T113 輸出 skew + 時脈 jitter 留 4.0 ns（保守，因為 T113 DS 沒給 Tco）
 → 剩 ~1 ns 給 PCB
 FR4 傳播延遲 ~6.7 ps/mm
 → 1000 ps / 6.7 ps/mm ≈ 149 mm
@@ -436,15 +448,15 @@ FR4 傳播延遲 ~6.7 ps/mm
 **在 100×100mm 的板子上，兩條走線最多也差不到 149mm —— 等長在物理上不可能成為瓶頸。**
 實作時對 CK 等長做到 ±10mm 即可，那是整齊，不是需求。
 
-> 這個**結論**對 ADV7511 幾乎確定仍成立（setup/hold 要差到 4 ns 以上才會翻盤，
-> 而 165 MHz 級的並列介面不會有那種規格），但**算式要用 ADV7511 的數字重跑一次**
-> —— 專案規則是「不把 A 晶片的數字掛到 B 晶片上」，這正是 v0.3 剛抓到的那類錯誤。
+> **v0.5 已用 ADV7511 的實際 tVSU/tVHLD 重跑。** 結論不變，而且餘裕還多了 0.5 ns。
+> 這一步不能省 —— 專案規則是「不把 A 晶片的數字掛到 B 晶片上」。
 
 > ROADMAP 風險 ⑤ 把「RGB 並列等長」列為主要風險，**這個定性要下修**。
 > 等長不是風險，SSO 與 jitter 才是。
 
 **真正的殺手是 SSO noise（Simultaneous Switching Output）**：22 條線同時翻轉造成的地彈與 EMI。
 地彈會直接吃掉橋接晶片的 jitter 預算 —— 這才是 148.5 MHz 下會出事的路徑。
+**而 ADV7511 沒有公布輸入 jitter 容許值，等於這條風險沒有數字可以驗算。**
 
 緩解手段：
 
@@ -463,27 +475,33 @@ GND 回流       走線下方必須是完整 GND 平面
 
 ### 3.2.1 ADV7511 的電源與電平
 
-`(ADV7511W Hardware User's Guide Rev.A, p.11 / p.17 / p.41)`
+`(ADV7511 Hardware User's Guide Rev.D §4 Table 1, p.12-13 —— 表頭明確標示 ADV7511KSTZ)`
 
 ```
-DVDD      1.8V   數位核心與 IO
-AVDD      1.8V   TMDS 輸出類比
-PVDD      1.8V   PLL          ← 最敏感
-BGVDD     1.8V   band-gap
-DVDD_3V   3.3V
+1.8V   DVdd / AVdd / PVdd / PLVdd / BGVdd     1.71 / 1.80 / 1.90 V    ← 五個域
+3.3V   MVdd                                   3.15 / 3.30 / 3.45 V
 
-1.8V 功耗  325 mW  →  約 180 mA
-3.3V 功耗    1 mW
+雜訊上限   DVdd 64 mV RMS · PVdd 64 mV RMS · BGVdd 64 mV RMS
+           AVdd / PLVdd 見 HW Guide §7.1（類比，更嚴）
+
+功耗   326 mW 總計（1.8V = 325 mW → 約 180 mA，3.3V = 1 mW）
+       條件 1080p / 36-bit；本板用 RGB666 會更低，但照最壞情況設計
+待機   Power-Down L1 20 mA · L2 300 µA
 ```
+
+⚠ **是五個 1.8V 域不是四個** —— v0.4 寫四個是抄 ADV7511W 的。
+KSTZ 多一個 **PLVdd（HDMI PLL – Analog）**，而且 3.3V 那條叫 **MVdd** 不是 `DVDD_3V`。
 
 #### ✅ 視訊輸入腳 3.3V 可直接驅動
 
 ```
-D[35:0] / CLK / HSYNC / VSYNC / DE
-  "Supports typical CMOS logic levels from 1.8V up to 3.3V."
+Data Inputs – Video / Audio / CEC_CLK
+  VIH   Min 1.35   Max 3.5 V
+  VIL   Min -0.3   Max 0.7 V
 ```
 
-**VCC-PD = 3.3V 的決定不必推翻，22 條 RGB 線不需要電平轉換。**
+**VIH 上限 3.5V → 3.3V CMOS 直接驅動沒問題。**
+VCC-PD = 3.3V 的決定不必推翻，22 條 RGB 線不需要電平轉換。
 
 #### ⚠ 但 1.8V 軌要加大
 
@@ -498,8 +516,12 @@ ADV7511                                    約 180 mA
 **外部 1.8V LDO 變成必須，且不能用 XC6206（典型僅 200 mA）。**
 改用 **AP2112K-1.8TRG1**（`C176944`，600 mA）。
 
-ADI 另外建議把四個 1.8V 域**分成 3 組獨立的 PCB 電源域各加 LC 濾波**（p.41 Figure 21），
-PVDD（PLL）最敏感。這是額外的 layout 工作量。
+五個 1.8V 域各有雜訊上限（DVdd/PVdd/BGVdd 各 64 mV RMS，AVdd/PLVdd 更嚴），
+**要分組並各自用磁珠或 LC 從幹線隔開**，PLL 那兩支（PVdd/PLVdd）最敏感。
+
+```
+[ ] 取 HW Guide §7.1 的去耦與分域建議（目前只有 Table 1 的雜訊上限數字）
+```
 
 #### 電源域淨變化：5 組回到 4 組
 
@@ -524,8 +546,11 @@ ADV7511 D35..D24                 →  GND（deep color 未用）
 
 ```
 [ ] 待確認：ADV7511 未用的 D[35:24] 是接 GND 還是浮接
-             → 回 ADV7511 datasheet 的 Pin Description 確認
+             → 需要 HW Guide p.19-20 的完整腳位表（目前只抽到 p.18 的腳位圖片段）
 ```
+
+✅ D[35:0] 的存在已確認 `(HW Guide Figure 6, p.18)` —— 36-bit deep color 輸入，
+24-bit 模式用 D[23:0]。
 
 ---
 
@@ -582,12 +607,13 @@ MIPI 還要對面板 timing、init sequence、lane 設定，變因多得多。
       → ADV7511 輸入上限 165 MHz，1080p60 的 148.5 MHz 在範圍內
 [ ] ADV7511 的 1.8V 域（DVDD/AVDD/PVDD/BGVDD）分成 3 組並各加 LC 濾波
 [ ] 1.8V LDO 為 600mA 等級（AP2112K-1.8），不是 XC6206
-[ ] ADV7511 的 DVDD_3V 接 3.3V
+[ ] ADV7511 的五個 1.8V 域（DVdd/AVdd/PVdd/PLVdd/BGVdd）分組並各自隔離
+[ ] ADV7511 的 MVdd 接 3.3V
 [ ] ADV7511 的 D[17:16] / D[9:8] / D[1:0] 接 GND（RGB666 未用的 6 個 LSB）
 [ ] ADV7511 未用的 D[35:24] 處置已依 datasheet 確認
 [ ] 原理圖上 RGB 接線一律標 LCD0-D 編號，不用顏色名稱（避免 R/B 對調）
 [ ] ADV7511 的 RESET# 接 GPIO（MIPI 模式時保持 reset）
-[ ] ADV7511 footprint：LQFP-100 14×14 + EPAD，依原廠機構圖驗算（見 008-footprint.md）
+[ ] ADV7511 footprint：`LQFP-100_14x14mm_P0.5mm`（MS-026-BED，**無 EPAD**，見 008-footprint.md §4A）
 ```
 
 ---
