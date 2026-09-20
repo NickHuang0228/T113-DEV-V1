@@ -3,12 +3,15 @@
 **來源**：`ADV7511 Hardware User's Guide, Rev. D, July 2011`（58 頁）
 `https://www.analog.com/media/en/technical-documentation/user-guides/ADV7511_Hardware_Users_Guide.pdf`
 
-**抽取方式**：ADI 官網封鎖 curl / PowerShell / WebFetch（HTTP 000 或連線重置），
-PDF 檔本身無法自動存檔。改用瀏覽器載入頁面後注入 pdf.js 抽取文字層。
-**頁碼為該 PDF 的頁碼，數字逐字照抄。**
+✅ **原始 PDF 已在本目錄**：`ADV7511_Hardware_Users_Guide.pdf`
+（846,967 bytes，58 頁，Rev D，2011-07；由使用者手動下載 ——
+ADI 封鎖所有自動下載，經過見本檔附錄）
 
-⚠ **這份是文字抽取，不是原始機構圖。** 依專案規則（ROADMAP 風險 ①），
-進 layout 前仍要取得原始 PDF 目視核對機構圖，特別是焊盤幾何。
+**本檔是那份 PDF 的中文摘要與索引**，方便設計文件引用；
+**數字逐字照抄，頁碼為該 PDF 的頁碼。有疑義一律以 PDF 原檔為準。**
+
+⚠ 機構圖（Figure 7, p.21）仍應**開原檔目視**再進 layout ——
+文字層給得出數字，給不出圖形。
 
 ---
 
@@ -148,34 +151,162 @@ SCLK Duty Cycle   N/2 偶數 40~60% ／ N/2 奇數 49~51%
 
 ---
 
-## 3. 腳位（Figure 6, p.18）
+## 3. 完整腳位表（Table 3, p.19-20）
 
-100-lead LQFP，文字層可辨識的腳位群：
-
-```
-視訊資料   D0 ~ D35
-同步       HSYNC · VSYNC · DE
-音訊       I2S0~I2S3 · SCLK · LRCLK · MCLK · SPDIF · DSD0/DSD1 · DSD_CLK
-HDMI       DDCSDA · DDCSCL · HEAC+ · HEAC-
-控制       SCL · SDA
-電源       PLVdd · PVdd · DVdd · MVdd · AVdd · BGVdd
-地         GND ×多支（一般接腳，非 EPAD）
-```
+### 3.1 視訊輸入
 
 ```
-[ ] 完整腳位表要回原始 PDF p.18-20 核對，本節只是文字層抽取的片段
+D[35:0]     pin 57-74, 78, 80-96    Video Data Input（RGB 或 YCbCr）
+CLK         pin 79                   Video Clock Input
+DE          pin 97
+HSYNC       pin 98
+VSYNC       pin 2
 ```
+
+**全部「Supports typical CMOS logic levels from 1.8V up to 3.3V」。**
+
+⚠ 注意 **pin 79 (CLK) 夾在 D 的兩段中間**（57-74 / 79 / 80-96），
+D 索引與腳號的對應要開 Figure 6 (p.18) 的腳位圖核對，Table 3 只給範圍。
+
+### 3.2 電源與地
+
+```
+AVDD    1.8V   pin 29, 34, 41             TMDS 輸出類比
+DVDD    1.8V   pin 1, 19, 49, 76, 77      數位與 IO —— "should be filtered and as quiet as possible"
+PVDD    1.8V   pin 24, 25                 PLL 數位 —— "quiet, noise-free"
+PLVDD   1.8V   pin 21                     PLL 類比（VCO）—— "the most sensitive portion of the ADV7511"
+BGVDD   1.8V   pin 26                     Band Gap
+MVDD    3.3V   pin 47
+GND            pin 18,20,22,23,27,31,37,44,75,99,100    ← 11 支，確認無 EPAD
+```
+
+> GND 說明：`"recommended that the ADV7511 be assembled on a single, solid ground plane
+> with careful attention given to ground current paths"`
+
+### 3.3 TMDS 輸出
+
+```
+TxC-/TxC+   pin 32, 33    時脈
+Tx2-/Tx2+   pin 42, 43    紅（pixel clock × 10）
+Tx1-/Tx1+   pin 39, 40    綠
+Tx0-/Tx0+   pin 35, 36    藍
+```
+
+### 3.4 控制與 HDMI
+
+```
+SDA        pin 56    1.8~3.3V CMOS
+SCL        pin 55    1.8~3.3V CMOS
+DDCSDA     pin 54    5V tolerant，接 HDMI 座
+DDCSCL     pin 53    5V tolerant，接 HDMI 座
+HPD        pin 30    1.8V ~ 5.0V CMOS
+INT        pin 45    輸出，建議 2kΩ(±10%) 上拉到 MCU 的 IO 電源
+CEC        pin 48    1.8~5V CMOS
+CEC_CLK    pin 50    3~100 MHz 外部時脈輸入
+HEAC+/-    pin 52/51 ARC 差分對
+R_EXT      pin 28    ★ 887Ω ±1% 接地
+PD/AD      pin 38    Power-Down 控制 **兼** I2C 位址選擇
+```
+
+⚠ **PD/AD (pin 38) 一腳兩用**：
+`"The I2C address and the PD polarity are set by the PD/AD pin state when the supplies are applied"`
+—— **上電當下的腳位狀態同時決定 I2C 位址與 PD 極性**，原理圖上要明確定義。
+
+### 3.5 音訊
+
+```
+SPDIF       pin 10          輸入
+SPDIF_OUT   pin 46          ARC 接收輸出，3.3V CMOS
+MCLK        pin 11          128/256/384/512 × fS
+I2S[3:0]    pin 15-12
+SCLK        pin 16
+LRCLK       pin 17
+DSD[5:0]    pin 8-3
+DSD_CLK     pin 9           2.8224 MHz
+```
+
+---
+
+## 3A. PCB Layout 建議（§7, p.52-54）—— 全部是硬性設計輸入
+
+### §7.1 電源濾波
+
+```
+五個 1.8V 域 → 合併成 3 組獨立的 PCB 電源域（Figure 23）
+每組輸出加 LC 濾波：10 µH 電感 + 10 µF 電容，盡量靠近 ADV7511
+   → 可把 20 kHz 以上的雜訊衰減到接近 0
+每一支電源腳再加 0.1 µF 到 GND plane，盡量貼近腳位；相鄰電源腳可共用
+GND 腳用 via 接到 GND plane
+AVDD / PLVDD 的雜訊上限見 Figure 24（DC~10MHz 曲線），其餘見 Table 1
+```
+
+### §7.2 視訊時脈與資料 ★
+
+```
+"Any noise coupled onto the CLK input trace will add jitter to the system."
+→ CLK (pin 79) 走線要做阻抗控制
+→ 走線下方用完整 GND 或電源參考面，確保全長阻抗一致
+→ CLK 走線盡量短，旁邊不要走數位或高頻訊號
+→ "Make sure to match the length of the input data signals to optimize data capture
+   especially for Double Data Rate (DDR) input formats"
+```
+
+⚠ **ADI 明確要求資料線等長**，即使我們的 skew 預算計算顯示餘裕很大。
+本板用 SDR（單邊緣），比 DDR 寬鬆，但**原廠建議照做**。
+
+⚠ **CLK 要阻抗控制** —— 這是單端訊號的阻抗控制需求，
+原本 005-stackup.md 只規劃了差分對的阻抗控制。
+
+### §7.3 音訊
+
+```
+音訊資料與時脈線等長；靠近源端串 50Ω ±5% 電阻
+```
+
+### §7.4 SDA / SCL
+
+```
+各上拉 2 kΩ ±5% 到 1.8V 或 3.3V
+```
+
+### §7.5 DDCSDA / DDCSCL
+
+```
+各上拉 1.5 kΩ ~ 2 kΩ ±5% 到 HDMI 的 +5V  —— "is required"（不是建議）
+```
+
+### §7.6 R_EXT ★
+
+```
+887 Ω ±1%，接在 R_EXT (pin 28) 與地之間，走線越短越好
+"strongly recommended to avoid running any high-speed AC or noisy signals next to
+ the R_EXT line" —— 特別點名 LRCLK（含 via）不可靠近 pin 28
+TMDS 的低準位切換雜訊影響不大
+```
+
+### §7.7 CEC
+
+```
+CEC_CLK 需要外部時脈：預設 12 MHz，3~100 MHz ±2% 皆可
+CEC 線：27 kΩ 上拉到 3.3V，漏電流 < 1.8 µA
+```
+
+⚠ **CEC 不是免費的** —— 要額外一顆振盪器。
+SPEC 原本就寫「CEC 可選，V1 不做」，現在有了明確理由。
 
 ---
 
 ## 4. 尚未取得
 
 ```
-[ ] 原始 PDF 檔本身（ADI 封鎖自動下載，見本檔頁首）
-[ ] Figure 7 的機構圖「圖形」—— 目前只有文字層的數字
-[ ] 完整腳位表（p.19-20）
-[ ] §7.1 的 AVdd / PLVdd 雜訊上限與去耦建議
-[ ] ADV7511 Programming Guide（2.8 MB，暫未取）
+[x] 原始 PDF —— 已在本目錄
+[x] 完整腳位表（Table 3, p.19-20）
+[x] §7 PCB Layout 建議（p.52-54）
+[ ] Figure 7 機構圖的「圖形」—— 數字已抄，但進 layout 前要開原檔目視
+[ ] Figure 6 (p.18) 腳位圖 —— D[35:0] 的索引與腳號對應
+[ ] Figure 23 (p.52) —— 五個 1.8V 域「怎麼分成 3 組」的實際分法
+[ ] Figure 24 (p.52) —— AVDD/PLVDD 雜訊上限曲線的實際數值
+[ ] ADV7511 Programming Guide（2.8 MB，暫未取；driver 移植階段才需要）
 ```
 
 ---
@@ -198,6 +329,11 @@ Chrome PDF viewer 下載鈕 + Ctrl+S  檔案不落地
 `fetch()` 在 analog.com 自己的頁面裡是同源的，回傳 200 與正確位元組數，
 但那些位元組沒有辦法存到磁碟。
 
-**所以這份 .md 是原始 PDF 的替代品，不是它的等價物。**
-機構圖是向量圖 —— 文字層給得出數字，給不出圖形。
-專案規則「定位靠文字，定案靠看圖」在這裡只完成了前半。
+**最後是由使用者在瀏覽器裡手動按下下載鈕才拿到檔案的。**
+下載後核對：846,967 bytes，與瀏覽器 `fetch()` 回報的位元組數完全一致，
+58 頁、Rev D，內容正確。
+
+**教訓：Chrome 不接受 CDP 合成的點擊作為觸發下載的「真人手勢」。**
+自動化能把視窗叫到前景、能把分頁切過去、能點中按鈕（圖示會反白），
+但最後那一下必須是真人。遇到擋下載的站，正確做法是
+**先用 pdf.js 把需要的數字抽出來解除阻塞，同時請使用者按一下把檔案收進版本庫。**

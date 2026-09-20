@@ -1,6 +1,6 @@
 # 001 · 電源樹與上電時序
 
-版本：v0.5 · 2026-09-20（ADV7511 原廠 Table 1 已取得:**五個** 1.8V 域、3.3V 那條叫 MVdd）
+版本：v0.6 · 2026-09-20（原始 PDF 入庫:電源腳位、LC 濾波規格、分域建議已確認）
 
 **資料來源**：`T113-S3_Datasheet_v1.6_20220303.pdf`，以下標註格式為 `(DS §5.3 p.45)`。
 交叉驗證對象：`MangoPi_MQ-R_sch_v1.6.pdf`（分壓值已驗算，見 §2.4）。
@@ -115,17 +115,43 @@ ADV7511                                                 約 180 mA
 現在那顆 XC6206 **容量不夠**，要換成貴 8 倍但足量的 AP2112K。
 **負載變了，元件選擇就要跟著重算 —— 不能因為上一版已經選好就沿用。**
 
-#### 1.8V 要分組隔離
+#### 1.8V 要分成 3 組，各加 LC —— ADI 有明確規格
 
-五個 1.8V 域各有雜訊上限（DVdd / PVdd / BGVdd 各 64 mV RMS，AVdd / PLVdd 更嚴），
-**要分組並各自用磁珠或 LC 從幹線隔開**，兩支 PLL 電源（PVdd / PLVdd）最敏感。
+`(HW User's Guide §7.1, p.52)`
 
 ```
-每支電源腳 0.1µF，盡量貼近腳位
-[ ] 取 HW User's Guide §7.1 的去耦與分域建議（目前只有 Table 1 的雜訊上限數字）
+"It is recommended to combine the five 1.8 volt power domains of the ADV7511
+ into 3 separate PCB power domains ... An LC filter on the output of the power
+ supply is recommended ... An effective LC filter for this is a 10 μH inductor
+ and a 10 μF capacitor ... This filter scheme will reduce any noise component
+ over 20KHz to effectively 0."
 ```
 
-這是額外的 layout 工作量，要在 placement 階段就留位置給那幾組 LC。
+```
+每組 1.8V 域：10 µH 電感 + 10 µF 電容，盡量靠近 ADV7511
+每一支電源腳：0.1 µF 到 GND plane，貼近腳位（相鄰電源腳可共用）
+GND 腳：各自用 via 接到 GND plane
+```
+
+電源腳位 `(Table 3, p.19-20)`：
+
+```
+AVDD    1.8V   pin 29, 34, 41          TMDS 輸出類比
+DVDD    1.8V   pin 1, 19, 49, 76, 77   數位與 IO（"filtered and as quiet as possible"）
+PVDD    1.8V   pin 24, 25              PLL 數位（"quiet, noise-free"）
+PLVDD   1.8V   pin 21                  PLL 類比 VCO —— "the most sensitive portion"
+BGVDD   1.8V   pin 26                  Band Gap
+MVDD    3.3V   pin 47
+GND            pin 18,20,22,23,27,31,37,44,75,99,100   ← 11 支，確認無 EPAD
+```
+
+```
+[ ] 開 Figure 23 (p.52) 確認「五個域怎麼分成 3 組」的實際分法
+[ ] 開 Figure 24 (p.52) 取 AVDD/PLVDD 雜訊上限曲線的數值
+```
+
+**三組 LC（3 顆 10µH + 3 顆 10µF）加上約 11 顆 0.1µF，要在 placement 階段就留位置。**
+10µH 的電感體積不小，不是 0402 能放的。
 
 #### 視訊輸入腳的電平：3.3V 直接可用
 
@@ -396,9 +422,11 @@ PVDD（PLL）最敏感
 
 ```
 TMDS Differential Swing  800 / 1000 / 1200 mV   (Table 1, p.13)
-[ ] 待確認：ADV7511 的 TMDS 擺幅是否靠外部電阻設定（IT66121 用 REXT 5.6kΩ）
-             → 需要 HW Guide p.19-20 的完整腳位表
+★ R_EXT (pin 28)  887 Ω ±1% 接地  —— 設定內部參考電流  (Table 3 p.19 / §7.6 p.54)
+  走線越短越好；⚠ LRCLK（含 via）不可靠近 pin 28
 ```
+
+⚠ 與 IT66121 的 REXT 5.6kΩ **值完全不同**，不可沿用。
 
 **注意 DC bias**：上一塊板學到的教訓 —— MLCC 在偏壓下容值會掉。
 
@@ -589,7 +617,8 @@ B. 背面 via 補焊
 [ ] MangoPi 的 RESET 腳實際有無電容、多大 → 決定要不要加 reset supervisor
 [x] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 還是 3.3V → **三者全選 3.3V**（見 §1.1）
 [x] 1.8V LDO 選型 → **AP2112K-1.8TRG1 (C176944, 600mA)**，XC6206 的 200mA 不夠
-[ ] ADV7511 的五個 1.8V 域如何分組隔離（對照 HW Guide §7.1）
+[x] ADV7511 五個 1.8V 域 → 合併成 **3 組**，各加 **10µH + 10µF** LC（§7.1 p.52）
+[ ] 開 Figure 23 確認 3 組的實際分法
 [ ] VCC-PD = 3.3V 時 MIPI 是否正常 —— 找有接 DSI 面板的參考設計核對
 [ ] Table 5-2 / 5-3 的數字回 p.45-48 原頁目視核對（pdftotext 欄位有錯位）
 ```

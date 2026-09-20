@@ -280,6 +280,9 @@ PCBA 數量   2 片
 
 ⚠ 阻抗線寬必須用 JLCPCB 回算值重畫，不能自行假設。
 
+⚠ **阻抗控制不只差分對** —— ADV7511 的 §7.2 要求 **LCD0-CLK 這條單端線也要控阻抗**
+（時脈上的雜訊會直接變成系統 jitter）。見 002-display.md §3.2.3。
+
 ---
 
 ## 7. 成本估算
@@ -429,12 +432,14 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [ ] MIPI D-PHY 的 4-lane 電流（電源軌已推定為 VCC-LVDS，見 001-power.md §2.2.2）
 - [ ] VDD18-DRAM (pin 50) 接內建 LDOA 還是外部 1.8V
 - [ ] ADV7511 的 RESET# 要接 GPIO（MIPI 模式時保持 reset）
-- [ ] 取得 HW Guide p.19-20 的完整腳位表（D[35:24] 處置、TMDS 擺幅設定電阻）
+- [x] **完整腳位表已取得** `(Table 3, p.19-20)`：R_EXT 887Ω±1%、11 支 GND、PD/AD 一腳兩用
+- [x] **§7 PCB Layout 建議已取得** `(p.52-54)`：3 組 1.8V + 10µH/10µF LC、CLK 要控阻抗
+- [ ] 開 Figure 6 (p.18) 確認 D[35:0] 的索引↔腳號對應
 - [x] 1.8V LDO 選型 → **AP2112K-1.8TRG1 (C176944, 600mA, $0.17)**；XC6206 的 200mA 不夠
 - [x] **ADV7511 機構圖數字已取得** `(HW Guide §5.1 p.21 Figure 7)`
       本體 14.00 SQ · 含腳 16.00 SQ · pitch 0.50 BSC · b 0.22 · L 0.60 · **無 EPAD**
       → KiCad `LQFP-100_14x14mm_P0.5mm` 可直接用，不需自建
-- [ ] ⚠ 原始 PDF 檔仍未存檔（ADI 封鎖自動下載），數字見 reference/peripherals/ADV7511KSTZ_extracted.md
+- [x] **原始 PDF 已入庫**：`docs/reference/peripherals/ADV7511_Hardware_Users_Guide.pdf`（58 頁 Rev D）
 - [x] RTL8201F 封裝機構圖 → QFN-32 5×5，pitch 0.5，EPAD 3.35×3.35 `(RTL DS §10.1, p.55, JEDEC MO-220)`
 - [x] VCC-PD / VCC-PE / VCC-PG → **全部 3.3V**（見 001-power.md §1.1）
 - [ ] RY1303（三路 DC-DC）的 LCSC 料況 → 決定用三路或分離式 ×3

@@ -957,3 +957,113 @@ const t = (await (await doc.getPage(i)).getTextContent()).items.map(x=>x.str).jo
 
 **對付擋下載的原廠站,這條路比找鏡像站可靠** ——
 鏡像站給的常常是別顆料(這次 Farnell 那個編號給了一顆施耐德感測器)。
+
+---
+
+## 2026-09-20 · 檔案進來了:最後一下必須是真人,以及腳位表裡的五個地雷
+
+### 下載這件事的結論
+
+Nick 手動按了下載鈕,檔案進 `docs/reference/peripherals/ADV7511_Hardware_Users_Guide.pdf`。
+**846,967 bytes —— 與我在瀏覽器裡 `fetch()` 回報的位元組數完全一致**,58 頁 Rev D。
+
+我在那之前做了一件有用的事:用 PowerShell 的 Win32 API 把 Chrome 視窗叫到前景
+(`AttachThreadInput` + `SetForegroundWindow`),再 navigate 把分頁切過去。
+原來那個分頁一直在 YouTube 那個視窗裡當背景分頁,Nick 根本看不到。
+
+然後又點了一次下載鈕,**圖示有反白(確認點中了),檔案還是不落地。**
+
+```
+結論:Chrome 不接受 CDP 合成的點擊作為觸發下載的「真人手勢」。
+自動化可以把視窗叫到前景、可以切分頁、可以點中按鈕,
+但最後那一下必須是真人。
+```
+
+**對付擋下載的原廠站,正確流程是:**
+1. 用 pdf.js 在頁面內抽文字層,先把數字拿到手,**解除設計阻塞**
+2. 同時把視窗叫到前景、分頁切好,請使用者按一下,**把檔案收進版本庫**
+
+兩件事並行,不要卡在第二件上。這次我在下載上耗了太久才想到第一條。
+
+### 拿到完整腳位表後,挖出五個原理圖地雷
+
+pdf.js 那次只抽到 Figure 6 的腳位「圖」片段,沒抽到 Table 3 的腳位「表」。
+開原檔一讀,五個都是漏掉就會出事的:
+
+**① R_EXT = 887 Ω ±1%(pin 28)**
+
+IT66121 的對應件是 REXT 5.6kΩ。**值差六倍,不可沿用。**
+而且 §7.6 特別點名:`"no switching signals – such as LRCLK (including vias) be routed
+close to the R_EXT pin"` —— 連 via 都點名了。
+
+**② PD/AD (pin 38) 一腳兩用**
+
+```
+"The I2C address and the PD polarity are set by the PD/AD pin state
+ when the supplies are applied to the ADV7511."
+```
+
+**上電瞬間的腳位狀態同時決定 I2C 位址與 Power-Down 極性。**
+如果當成普通 GPIO 隨便接,可能開機後在錯的 I2C 位址上找不到晶片 ——
+而且症狀會像「晶片壞了」。
+
+**③ DDCSDA/DDCSCL 的上拉是 "required" 不是 "recommended"**
+
+1.5k~2kΩ ±5% 到 **HDMI 的 +5V**。原文用 required。
+
+**④ CEC 要外部振盪器**
+
+CEC_CLK (pin 50) 需要 3~100 MHz ±2% 的外部時脈,預設 12 MHz。
+SPEC 原本就寫「CEC 可選,V1 不做」—— 現在有明確理由:**省一顆振盪器。**
+當初那個決定是憑感覺做的,今天才知道是對的。
+
+**⑤ LCD0-CLK 要做阻抗控制**
+
+```
+§7.2: "Any noise that is coupled onto the CLK input trace will add jitter to the system.
+       It is recommended to control the impedance of the CLK trace."
+```
+
+**這是單端訊號的阻抗控制需求。** 005-stackup.md 原本只規劃了 13 對差分,
+現在多一條單端線要進阻抗清單。
+
+### 關於等長:我要修正自己的語氣,不是結論
+
+ADI §7.2 明確寫 `"Make sure to match the length of the input data signals"`。
+
+我先前算出 PCB skew 有 ~149mm 餘裕,把 ROADMAP 風險 ⑤ 從「等長」改成「SSO noise」。
+**那個計算沒錯,但我的表述太鬆了。**
+
+```
+計算說明的是「做不到也不會死」
+不是「可以不做」
+```
+
+對 CK 等長做到 ±10mm 本來就是免費的,原廠建議就照做。
+**把餘裕當成偷懶的許可,是誤用驗算結果。**
+
+### 電源濾波有具體規格,不是「加個磁珠」
+
+```
+五個 1.8V 域 → 合併成 3 組獨立 PCB 電源域
+每組:10 µH 電感 + 10 µF 電容,盡量靠近晶片
+     → 20 kHz 以上的雜訊衰減到接近 0
+每支電源腳:0.1 µF 貼近腳位(相鄰腳可共用)
+GND 腳:各自 via 下 GND plane
+```
+
+**10 µH 的電感體積不小,不是 0402 能放的。** 三組加起來要在 placement 階段就留位置。
+這比我原本寫的「用磁珠隔開」具體得多,也佔地方得多。
+
+### 還沒做完的
+
+```
+[ ] Figure 6 (p.18)  D[35:0] 的索引↔腳號對應 —— Table 3 只給範圍 57-74/78/80-96
+     ⚠ pin 79 (CLK) 夾在 D 的兩段中間,不能用「連號」推
+[ ] Figure 23 (p.52) 五個 1.8V 域「怎麼分成 3 組」的實際分法
+[ ] Figure 24 (p.52) AVDD/PLVDD 雜訊上限曲線的數值
+[ ] 未用的 D[35:24] 與 D[17:16]/D[9:8]/D[1:0] 的處置(慣例接 GND,但 ADI 沒明說)
+```
+
+這四項都是**圖,不是表** —— 文字層抽不出來,要開 PDF 目視。
+專案規則「定位靠文字,定案靠看圖」,現在終於有圖可看了。

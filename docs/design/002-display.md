@@ -1,6 +1,6 @@
 # 002 · 顯示介面：MIPI DSI 與 RGB→HDMI
 
-版本：v0.5 · 2026-09-20（取得 ADV7511 原廠規格:**無 EPAD**、輸入電容 1.5pF、tVSU/tVHLD 已重算）
+版本：v0.6 · 2026-09-20（原始 PDF 入庫,補完整腳位表與 §7 layout 建議）
 
 **專案優先序：MIPI DSI > RGB/HDMI。** 長期目標是 DSI layout 經驗，HDMI 是附帶。
 
@@ -544,13 +544,84 @@ ADV7511 D17/D16 · D9/D8 · D1/D0  →  GND
 ADV7511 D35..D24                 →  GND（deep color 未用）
 ```
 
+`(HW Guide Table 3, p.19)`
+
 ```
-[ ] 待確認：ADV7511 未用的 D[35:24] 是接 GND 還是浮接
-             → 需要 HW Guide p.19-20 的完整腳位表（目前只抽到 p.18 的腳位圖片段）
+D[35:0]   pin 57-74, 78, 80-96      CLK  pin 79
+DE  pin 97      HSYNC  pin 98      VSYNC  pin 2
 ```
 
-✅ D[35:0] 的存在已確認 `(HW Guide Figure 6, p.18)` —— 36-bit deep color 輸入，
-24-bit 模式用 D[23:0]。
+⚠ **pin 79 (CLK) 夾在 D 的兩段腳號中間** —— D 索引與腳號的對應要開
+Figure 6 (p.18) 的腳位圖核對，Table 3 只給範圍。
+
+```
+[ ] 開 Figure 6 確認 D[35:0] 的索引↔腳號對應
+[ ] 未用的 D[35:24] 與 D[17:16]/D[9:8]/D[1:0] 的處置（datasheet 未明說，
+     慣例是接 GND；要確認 ADI 有無反對）
+```
+
+### 3.2.2 ★ 原理圖必備的外部元件（§7, p.52-54）
+
+這些是 datasheet 明列的**硬性要求**，漏一個就可能不動或不穩：
+
+```
+R_EXT (pin 28)      887 Ω ±1% 接地            ★ 設定內部參考電流
+                    走線越短越好
+                    ⚠ 特別點名 LRCLK（含 via）不可靠近 pin 28
+
+DDCSDA / DDCSCL     1.5k ~ 2kΩ ±5% 上拉到 HDMI +5V    ★ 原文寫 "is required"
+SDA / SCL           2 kΩ ±5% 上拉到 1.8V 或 3.3V
+INT (pin 45)        2 kΩ ±10% 上拉到 MCU 的 IO 電源（本板 = 3.3V）
+
+CEC (pin 48)        27 kΩ 上拉到 3.3V，漏電流 < 1.8 µA
+CEC_CLK (pin 50)    ⚠ 需要外部振盪器：預設 12 MHz，3~100 MHz ±2%
+```
+
+⚠ **CEC 不是免費的** —— 要多一顆振盪器。
+SPEC 原本就決定「CEC 可選，V1 不做」，現在有了明確理由：**省一顆料。**
+CEC_CLK 不接時要確認 ADV7511 的行為（CEC 功能停用即可）。
+
+#### ⚠ PD/AD (pin 38) 一腳兩用 —— 原理圖上必須明確定義
+
+```
+"The I2C address and the PD polarity are set by the PD/AD pin state
+ when the supplies are applied to the ADV7511."
+```
+
+**上電當下的腳位狀態同時決定 I2C 位址與 Power-Down 極性。**
+不能只當成一般 GPIO 隨便接 —— 要嘛固定上/下拉，要嘛接 GPIO 但確保上電時的準位確定。
+
+```
+[ ] 決定 PD/AD 的接法，並在原理圖上標註它決定的 I2C 位址
+```
+
+### 3.2.3 ★ CLK 要做阻抗控制（新增的 layout 需求）
+
+`(§7.2, p.53)`
+
+```
+"Any noise that is coupled onto the CLK input trace will add jitter to the system.
+ It is recommended to control the impedance of the CLK trace."
+→ 走線下方用完整 GND 或電源參考面，確保全長阻抗一致
+→ CLK (pin 79) 走線盡量短
+→ 旁邊不要走數位或其他高頻訊號
+```
+
+⚠ **這是單端訊號的阻抗控制需求。** 005-stackup.md 原本只規劃了
+13 對差分的阻抗控制，**LCD0-CLK 這條單端線要另外列入**。
+
+#### 關於資料線等長：ADI 的說法要照做
+
+```
+"Make sure to match the length of the input data signals to optimize data capture
+ especially for Double Data Rate (DDR) input formats."
+```
+
+我們在 §3.2 算出 PCB skew 有 ~149mm 餘裕、結論是「等長不是瓶頸」——
+**那個計算仍然成立**（本板是 SDR 單邊緣，比 DDR 寬鬆得多）。
+但**原廠明確建議等長，所以照做** —— 做到對 CK ±10mm 本來就是免費的。
+
+**計算說明的是「做不到也不會死」，不是「可以不做」。**
 
 ---
 
@@ -597,6 +668,13 @@ MIPI 還要對面板 timing、init sequence、lane 設定，變因多得多。
 ## 5. 驗收
 
 ```
+[ ] ★ R_EXT = 887Ω ±1%，走線短，LRCLK 與 via 不靠近 pin 28
+[ ] ★ DDCSDA/DDCSCL 上拉 1.5k~2kΩ 到 HDMI +5V（datasheet 寫 required）
+[ ] ★ SDA/SCL 上拉 2kΩ、INT 上拉 2kΩ 到 3.3V
+[ ] ★ PD/AD (pin 38) 接法已定義，且原理圖標註它決定的 I2C 位址
+[ ] ★ LCD0-CLK 列入阻抗控制清單（單端），走線短、旁無高頻訊號
+[ ] ADV7511 五個 1.8V 域分成 3 組，各加 10µH + 10µF 的 LC
+[ ] 每支電源腳 0.1µF 貼近腳位；GND 腳各自用 via 下 GND plane
 [ ] MIPI 5 對阻抗 100Ω，對內等長 ±0.1mm，全程不跨分割
 [ ] MIPI 線上無串聯電阻、無 AC 耦合電容
 [ ] TMDS 4 對阻抗 100Ω，對內等長 ±0.15mm
