@@ -1,0 +1,9 @@
+{
+  "board": {"design_settings": {}},
+  "libraries": {"pinned_footprint_libs": [], "pinned_symbol_libs": []},
+  "meta": {"filename": "T113-DEV-V1.kicad_pro", "version": 3},
+  "net_settings": {"classes": [{"name": "Default", "clearance": 0.2, "track_width": 0.25, "via_diameter": 0.6, "via_drill": 0.3}]},
+  "schematic": {"annotate_start_num": 0, "legacy_lib_dir": "", "legacy_lib_list": []},
+  "sheets": [],
+  "text_variables": {}
+}

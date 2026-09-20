@@ -1,0 +1,16 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "00000000-0000-0000-0000-000000000001")
+	(paper "A3")
+	(title_block
+		(title "T113-DEV-V1")
+		(company "NickHuang")
+		(comment 1 "根目錄圖紙 —— 各介面分頁掛在這裡")
+	)
+	(lib_symbols)
+	(sheet_instances
+		(path "/" (page "1"))
+	)
+)

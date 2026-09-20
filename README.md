@@ -112,4 +112,5 @@ PCB      4 層 · 阻抗控制 · 100×100mm 以內
 | [docs/design/009-bom.md](docs/design/009-bom.md) | **BOM 料況查證、橋接晶片改選 ADV7511** |
 | [docs/design/010-symbol.md](docs/design/010-symbol.md) | **T113-S3 符號建立、128 腳核對、四處非連號** |
 | [docs/design/011-power-tree.md](docs/design/011-power-tree.md) | **電源樹定案:分壓值、時序電路、RESET supervisor** |
+| [hardware/README.md](hardware/README.md) | **KiCad 專案與協作方式（Nick 畫 · Claude 自動檢查）** |
 | [notes/devlog.md](notes/devlog.md) | 開發日誌 |
