@@ -1,6 +1,6 @@
 # 002 · 顯示介面：MIPI DSI 與 RGB→HDMI
 
-版本：v0.6 · 2026-09-20（原始 PDF 入庫,補完整腳位表與 §7 layout 建議）
+版本：v0.7 · 2026-09-20（讀完 Figure 6/23/24/27:腳位級接線表定案,RGB 分散在晶片兩邊）
 
 **專案優先序：MIPI DSI > RGB/HDMI。** 長期目標是 DSI layout 經驗，HDMI 是附帶。
 
@@ -544,21 +544,53 @@ ADV7511 D17/D16 · D9/D8 · D1/D0  →  GND
 ADV7511 D35..D24                 →  GND（deep color 未用）
 ```
 
-`(HW Guide Table 3, p.19)`
+### ✅ 腳位級接線表（Figure 6, p.18 目視抄出）
+
+`T113 PD → LCD0-D → ADV7511 D → ADV7511 pin`
 
 ```
-D[35:0]   pin 57-74, 78, 80-96      CLK  pin 79
-DE  pin 97      HSYNC  pin 98      VSYNC  pin 2
+R  PD17 → D23 → pin 69       G  PD11 → D15 → pin 81      B  PD5 → D7 → pin 89
+   PD16 → D22 → pin 70          PD10 → D14 → pin 82         PD4 → D6 → pin 90
+   PD15 → D21 → pin 71          PD9  → D13 → pin 83         PD3 → D5 → pin 91
+   PD14 → D20 → pin 72          PD8  → D12 → pin 84         PD2 → D4 → pin 92
+   PD13 → D19 → pin 73          PD7  → D11 → pin 85         PD1 → D3 → pin 93
+   PD12 → D18 → pin 74          PD6  → D10 → pin 86         PD0 → D2 → pin 94
+
+   PD18 → LCD0-CLK   → pin 79      PD20 → LCD0-HSYNC → pin 98
+   PD19 → LCD0-DE    → pin 97      PD21 → LCD0-VSYNC → pin 2     ⚠ 在左側
 ```
 
-⚠ **pin 79 (CLK) 夾在 D 的兩段腳號中間** —— D 索引與腳號的對應要開
-Figure 6 (p.18) 的腳位圖核對，Table 3 只給範圍。
+接 GND 的未用輸入：
 
 ```
-[ ] 開 Figure 6 確認 D[35:0] 的索引↔腳號對應
-[ ] 未用的 D[35:24] 與 D[17:16]/D[9:8]/D[1:0] 的處置（datasheet 未明說，
-     慣例是接 GND；要確認 ADI 有無反對）
+D17 (78) · D16 (80) · D9 (87) · D8 (88) · D1 (95) · D0 (96)
+D[35:24] = pin 57~68     ← 右側連續 12 支，好走線
 ```
+
+```
+[ ] 未用 D 腳接 GND —— datasheet 未明說，但它們是輸入腳（VIL -0.3~0.7V），
+     接 GND 電氣上安全。**這是判斷，不是引用。**
+```
+
+### ⚠⚠ 這張表帶出一個 placement 問題：RGB 分散在晶片三個邊
+
+```
+ADV7511 頂側 (pin 81~94)    ← B[5:0] + G[5:0]  = PD0 ~ PD11
+        頂側 (79/97/98)     ← CLK / DE / HSYNC = PD18 / PD19 / PD20
+        右側 (pin 69~74)    ← R[5:0]           = PD12 ~ PD17
+        左側 (pin 2)        ← VSYNC            = PD21      ★ 在對面
+```
+
+**T113 那一側 22 條全在 PD bank 連續排列，ADV7511 這一側卻跨三個邊。**
+
+```
+→ 18 條資料分成「12 條進頂邊 + 6 條進右邊」兩束
+→ VSYNC 一條要繞到晶片左側，是全組裡最長的一條
+→ ★ MIPI 共用的 PD0~PD9 全部落在頂側 pin 83~94
+     10 顆 0Ω 可以集中在頂邊,對 §1.3「0Ω 貼著主幹」有利
+```
+
+**ADV7511 的旋轉角度直接決定這三束線會不會打架** —— placement 第一件事就是定它的方位。
 
 ### 3.2.2 ★ 原理圖必備的外部元件（§7, p.52-54）
 
@@ -573,9 +605,15 @@ DDCSDA / DDCSCL     1.5k ~ 2kΩ ±5% 上拉到 HDMI +5V    ★ 原文寫 "is req
 SDA / SCL           2 kΩ ±5% 上拉到 1.8V 或 3.3V
 INT (pin 45)        2 kΩ ±10% 上拉到 MCU 的 IO 電源（本板 = 3.3V）
 
-CEC (pin 48)        27 kΩ 上拉到 3.3V，漏電流 < 1.8 µA
+CEC (pin 48)        27 kΩ 上拉到 3.3V + 串一顆漏電 <1.8 µA 的二極體
 CEC_CLK (pin 50)    ⚠ 需要外部振盪器：預設 12 MHz，3~100 MHz ±2%
 ```
+
+完整參考接法見 **Figure 27 (p.55) Example Schematic**，已抄進
+[../reference/peripherals/ADV7511KSTZ_extracted.md](../reference/peripherals/ADV7511KSTZ_extracted.md) §3B。
+
+⚠ Figure 27 上 INT 與 SDA/SCL 的上拉畫 1.8V（ADI 範例主機是 1.8V）。
+**本板 T113 的 PD/PG bank 是 3.3V，所以上拉到 3.3V** —— §7.4 明確寫「1.8V 或 3.3V」。
 
 ⚠ **CEC 不是免費的** —— 要多一顆振盪器。
 SPEC 原本就決定「CEC 可選，V1 不做」，現在有了明確理由：**省一顆料。**

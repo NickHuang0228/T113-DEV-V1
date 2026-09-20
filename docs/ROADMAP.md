@@ -237,8 +237,10 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
 - [x] **ADV7511 原始 PDF 已入庫**（58 頁 Rev D），完整腳位表與 §7 layout 建議已取
 - [ ] ⚠ RTL8201F 確認用 datasheet §10.1 的 QFN-32，不是 §10.2 LQFP-48 / §10.3 QFN-48
 - [ ] 電源上電時序對照 datasheet，寫成文件記錄
-- [ ] **1.8V LDO 為 600mA 等級**（AP2112K-1.8）
-- [ ] ADV7511 五個 1.8V 域合併成 **3 組**，各加 **10µH + 10µF** LC（§7.1）
+- [ ] **1.8V 拆成兩條**：SoC 一顆、**ADV7511 專屬一顆**（ADI §6.8 要求）
+- [ ] ADV7511 的 1.8V 分 **3 組**：DVDD ／ AVDD+PVDD ／ PLVDD+BGVDD，各加 10µH+10µF
+- [ ] ADV7511 每支電源腳 0.1µF、11 支 GND 各自 via 下 plane
+- [ ] ADV7511 未用的 D[35:24](pin 57~68) 與 D17/D16/D9/D8/D1/D0 接 GND
 - [ ] ★ **R_EXT = 887Ω ±1%** 已放，走線短，LRCLK 與 via 不靠近 pin 28
 - [ ] ★ DDCSDA/DDCSCL 上拉 1.5k~2kΩ 到 HDMI +5V（datasheet 寫 required）
 - [ ] ★ PD/AD (pin 38) 接法已定義（它同時決定 I2C 位址與 PD 極性）

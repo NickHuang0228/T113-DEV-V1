@@ -1,6 +1,6 @@
 # 001 · 電源樹與上電時序
 
-版本：v0.6 · 2026-09-20（原始 PDF 入庫:電源腳位、LC 濾波規格、分域建議已確認）
+版本：v0.7 · 2026-09-20（Figure 23/24 讀完:**ADV7511 要自己專屬的 1.8V LDO**,三組分法定案）
 
 **資料來源**：`T113-S3_Datasheet_v1.6_20220303.pdf`，以下標註格式為 `(DS §5.3 p.45)`。
 交叉驗證對象：`MangoPi_MQ-R_sch_v1.6.pdf`（分壓值已驗算，見 §2.4）。
@@ -115,6 +115,42 @@ ADV7511                                                 約 180 mA
 現在那顆 XC6206 **容量不夠**，要換成貴 8 倍但足量的 AP2112K。
 **負載變了，元件選擇就要跟著重算 —— 不能因為上一版已經選好就沿用。**
 
+#### ⚠⚠ ADI 要求 ADV7511 用**自己專屬**的 1.8V LDO
+
+`(HW User's Guide §6.8 Power Domains, p.50)`
+
+```
+"It is recommended that the ADV7511 has its own designated 1.8V linear regulator
+ and that the AVDD, DVDD and PLVDD PCB power domains be segregated using inductors."
+```
+
+**不是與 SoC 共用 1.8V。** 所以 1.8V 要拆成兩顆 LDO：
+
+```
+3.3V ──┬──[LDO #1]──▶ 1.8V-SOC   VCC-PLL / VCC-RTC / VCC-LVDS / AVCC / VDD18-DRAM
+       │                          約 52 mA + 幾項 TBD
+       │
+       └──[LDO #2]──▶ 1.8V-HDMI  ADV7511 專屬，約 180 mA
+                                  再分成 3 組，各加 10µH + 10µF（見下）
+```
+
+**這反而讓選料變簡單了** —— v0.4 為了「一顆 LDO 撐 232 mA」選了 600 mA 的 AP2112K，
+現在兩顆各自負載小很多：
+
+| | 負載 | 選料 |
+|---|---|---|
+| **LDO #1（SoC 1.8V）** | ~52 mA + TBD | 內建 LDOA（260 mA）夠用，或外掛 XC6206 當備援 |
+| **LDO #2（ADV7511 專屬）** | ~180 mA | **AP2112K-1.8TRG1**（`C176944`，600 mA，$0.17） |
+
+⚠ 但 §6.8 只說「recommended」。**若為了省一顆 LDO 而共用，風險是 SoC 側的
+負載跳變（例如 DDR 或 GPIO 大量翻轉）會耦合到 ADV7511 的 PLL 電源** ——
+而 Figure 24 顯示 PLL 電源在 200kHz~1MHz 只容許 1.3 mV rms。
+**第一塊板不省這 $0.17。**
+
+```
+[ ] 電源樹圖要改成兩條 1.8V，SPEC §5 一併更新
+```
+
 #### 1.8V 要分成 3 組，各加 LC —— ADI 有明確規格
 
 `(HW User's Guide §7.1, p.52)`
@@ -145,10 +181,54 @@ MVDD    3.3V   pin 47
 GND            pin 18,20,22,23,27,31,37,44,75,99,100   ← 11 支，確認無 EPAD
 ```
 
+#### ✅ Figure 23 (p.50) 的實際分法 —— 不是一個名字一組
+
 ```
-[ ] 開 Figure 23 (p.52) 確認「五個域怎麼分成 3 組」的實際分法
-[ ] 開 Figure 24 (p.52) 取 AVDD/PLVDD 雜訊上限曲線的數值
+1.8V-HDMI LDO ──┬──[10 µH]──┬── DVDD    pin 1, 19, 49, 76, 77
+                │           └─[10 µF]─GND
+                │
+                ├──[10 µH]──┬── AVDD    pin 29, 34, 41
+                │           │   PVDD    pin 24, 25        ← AVDD 與 PVDD 併一組
+                │           └─[10 µF]─GND
+                │
+                └──[10 µH]──┬── PLVDD   pin 21
+                            │   BGVDD   pin 26            ← PLVDD 與 BGVDD 併一組
+                            └─[10 µF]─GND
+
+所有 bypass 0.1 µF（每支電源腳一顆，相鄰腳可共用）
+GND 腳（11 支）各自用 via 下 GND plane
 ```
+
+#### ⚠⚠ Figure 24 (p.52)：最嚴的雜訊上限落在 DC-DC 的切換頻段
+
+AVDD / PLVDD 的 Max rms noise vs frequency，目視讀值：
+
+```
+1 ~ 20 kHz      約 28.5 mV     平坦
+~25-30 kHz      約 29 mV       小峰
+100 kHz         約 9.5 mV
+200 k ~ 300 kHz 約 1.3 mV      ★ 最嚴
+300 k ~ 1 MHz   約 1.5 ~ 1.7 mV
+1 M ~ 5 MHz     約 1.8 ~ 3 mV
+10 MHz          約 5.5 mV
+```
+
+**1.3 mV rms @ 200kHz~1MHz —— 正好是 RY1303 這類 DC-DC 的切換基頻與低階諧波。**
+
+```
+→ 這就是「LDO 不是 DC-DC」+「再加 LC」的理由,兩層都不能省
+→ 也是 §6.8 要求專屬 LDO 的理由:共用的話 SoC 側的負載跳變會打進這個頻段
+```
+
+#### ✅ §6.8.1 (p.50)：ADV7511 沒有上電時序要求
+
+```
+"There is no required sequence for turning on or turning off the power domains;
+ all should be fully powered up or down within 1 second of the others."
+```
+
+**與 T113-S3 的 T1>2ms / T2>64ms 不同 —— ADV7511 這邊不用排序**，
+1.8V-HDMI 可以直接掛在 3.3V 穩定之後，不必進 §3 的時序鏈。
 
 **三組 LC（3 顆 10µH + 3 顆 10µF）加上約 11 顆 0.1µF，要在 placement 階段就留位置。**
 10µH 的電感體積不小，不是 0402 能放的。
@@ -617,8 +697,9 @@ B. 背面 via 補焊
 [ ] MangoPi 的 RESET 腳實際有無電容、多大 → 決定要不要加 reset supervisor
 [x] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 還是 3.3V → **三者全選 3.3V**（見 §1.1）
 [x] 1.8V LDO 選型 → **AP2112K-1.8TRG1 (C176944, 600mA)**，XC6206 的 200mA 不夠
-[x] ADV7511 五個 1.8V 域 → 合併成 **3 組**，各加 **10µH + 10µF** LC（§7.1 p.52）
-[ ] 開 Figure 23 確認 3 組的實際分法
+[x] ADV7511 五個 1.8V 域 → **3 組**：DVDD ／ AVDD+PVDD ／ PLVDD+BGVDD，各加 10µH+10µF
+[x] ADV7511 要**自己專屬的 1.8V LDO**（§6.8）→ 1.8V 拆成兩條
+[ ] 電源樹圖與 SPEC §5 改成兩條 1.8V
 [ ] VCC-PD = 3.3V 時 MIPI 是否正常 —— 找有接 DSI 面板的參考設計核對
 [ ] Table 5-2 / 5-3 的數字回 p.45-48 原頁目視核對（pdftotext 欄位有錯位）
 ```

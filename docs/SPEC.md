@@ -233,21 +233,30 @@ Type-C VBUS 5V
   ├─ DC-DC   →  3.3V   VCC-IO / GPIO bank / PHY / ADV7511 / LDO-IN   ~470mA
   ├─ DC-DC   →  1.5V   VCC-DRAM0/1（DDR3 本體）                       TBD
   ├─ DC-DC   →  0.9V   VDD-CORE0/1 + VDD-SYS0/1/2                    TBD
-  ├─ LDO     →  1.8V   VCC-PLL / VCC-RTC / VCC-LVDS / AVCC / VDD18-DRAM
-  │                     外部 LDO，晶片內建 LDOA 僅 260mA 不夠賭
+  ├─ LDO #1  →  1.8V   VCC-PLL / VCC-RTC / VCC-LVDS / AVCC / VDD18-DRAM   ~52mA+TBD
+  │                     （SoC 側；內建 LDOA 260mA 可用，外掛一顆當備援）
+  ├─ LDO #2  →  1.8V   ADV7511 專屬                                      ~180mA
+  │                     ⚠ ADI §6.8 要求「its own designated 1.8V linear regulator」
+  │                     再分 3 組各加 10µH+10µF：DVDD ／ AVDD+PVDD ／ PLVDD+BGVDD
   └─ 直通     →  5V    USB-A Host（含限流）                           500mA
 
-外部電壓：**3.3V / 1.5V / 0.9V / 1.8V 共 4 組**
-（3.3/1.5/0.9 用單顆三路 DC-DC RY1303，1.8V 用一顆 600mA LDO）
+外部電壓：**3.3V / 1.5V / 0.9V / 1.8V×2 共 4 種電壓、5 顆電源元件**
+（3.3/1.5/0.9 用單顆三路 DC-DC RY1303；1.8V 用兩顆 LDO，SoC 與 ADV7511 各一）
 
 ⚠ 1.8V 不要全押內建 LDOA（只有 260mA，且 VDD18-DRAM / AVCC / VCC-TVIN 在 datasheet 是 TBD）。
 MangoPi 自己也放了外部 XC6206-1.8V LDO。多一顆 $0.05 換掉一個未知數。
 
-⚠ **1.8V 軌的容量是 v0.4 的新約束** —— ADV7511 的 1.8V 域吃約 180mA，
-加上原有 52mA 已逼近晶片內建 LDOA 的 260mA 上限。
-**外部 1.8V LDO 必須是 600mA 等級（AP2112K-1.8），XC6206 的 200mA 不夠。**
+⚠ **1.8V 要拆成兩條** —— ADI §6.8 要求 ADV7511 有自己專屬的 1.8V LDO，
+不與 SoC 共用。理由在 Figure 24：**AVDD/PLVDD 在 200kHz~1MHz 只容許 1.3 mV rms**，
+而那正是 DC-DC 切換與 SoC 負載跳變的頻段。
 
-⚠ 另外 ADI 要求把 ADV7511 的四個 1.8V 域分成 3 組獨立 PCB 電源域各加 LC 濾波。
+```
+LDO #1  SoC 1.8V        ~52mA + TBD   內建 LDOA 夠用
+LDO #2  ADV7511 專屬     ~180mA        AP2112K-1.8 (C176944, 600mA, $0.17)
+        再分 3 組各加 10µH + 10µF
+```
+
+**第一塊板不省這 $0.17。**
 
 ⚠ 周邊 IC 的電源腳必須逐顆開 Power/Ground Pins 那一頁，不能假設「3.3V 單軌」——
 IT66121 要 1.2V、ADV7511 要 1.8V、RTL8201F 只要 3.3V，三顆三種答案。
@@ -434,7 +443,9 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [ ] ADV7511 的 RESET# 要接 GPIO（MIPI 模式時保持 reset）
 - [x] **完整腳位表已取得** `(Table 3, p.19-20)`：R_EXT 887Ω±1%、11 支 GND、PD/AD 一腳兩用
 - [x] **§7 PCB Layout 建議已取得** `(p.52-54)`：3 組 1.8V + 10µH/10µF LC、CLK 要控阻抗
-- [ ] 開 Figure 6 (p.18) 確認 D[35:0] 的索引↔腳號對應
+- [x] **Figure 6/23/24/27 已讀完**：D[35:0] 腳號、1.8V 三組分法、雜訊曲線、參考原理圖
+- [x] **ADV7511 需專屬 1.8V LDO** `(§6.8 p.50)`；**無上電時序要求** `(§6.8.1)`
+- [x] **RGB 接線表定案**（腳位級，見 002-display.md §3.2）
 - [x] 1.8V LDO 選型 → **AP2112K-1.8TRG1 (C176944, 600mA, $0.17)**；XC6206 的 200mA 不夠
 - [x] **ADV7511 機構圖數字已取得** `(HW Guide §5.1 p.21 Figure 7)`
       本體 14.00 SQ · 含腳 16.00 SQ · pitch 0.50 BSC · b 0.22 · L 0.60 · **無 EPAD**
