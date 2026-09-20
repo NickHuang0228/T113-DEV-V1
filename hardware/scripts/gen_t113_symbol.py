@@ -19,6 +19,10 @@ if hasattr(sys.stdout, "reconfigure"):
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CSV = os.path.join(ROOT, "data", "T113-S3_pinmap.csv")
+# 另一份獨立來源：tools/extract_pins.py 從 Table 4-2 機器抽出的表。
+# 兩份是不同方法得到的（目視抄 Figure 7-1 vs find_tables 抽 Table 4-2），
+# 互為驗證。只要還沒合併成一份，就每次生成時比對一次，防止偷偷長歪。
+CROSS_CSV = os.path.join(os.path.dirname(os.path.dirname(ROOT)), "T113-DEV-V1", "tools", "t113s3_pins.csv")
 OUT = os.path.join(ROOT, "symbols", "T113-DEV-V1.kicad_sym")
 
 PITCH = 2.54
@@ -90,8 +94,27 @@ def build_unit(idx, title, rows):
     return "\n".join(body), title
 
 
+def cross_check(rows):
+    """與 tools/t113s3_pins.csv 比對。兩份來源不同方法，不該有差異。"""
+    if not os.path.exists(CROSS_CSV):
+        print("  ⚠ 找不到 tools/t113s3_pins.csv，跳過交叉檢查")
+        return
+    other = {r["pin"]: r["name"].strip()
+             for r in csv.DictReader(io.open(CROSS_CSV, encoding="utf-8"))}
+    mine = {r["pin"]: r["name"].strip() for r in rows}
+    bad = [(p, other.get(p), mine.get(p))
+           for p in sorted(set(other) | set(mine), key=int)
+           if other.get(p) != mine.get(p) and p != "129"]   # 129=EPAD 只有本表有
+    if bad:
+        for p, o, m in bad:
+            print(f"  ✗ pin {p}: tools/={o}  data/={m}")
+        sys.exit("兩份腳位表不一致 —— 先查清楚哪一份錯了，不要直接生成")
+    print(f"  ✓ 與 tools/t113s3_pins.csv 交叉檢查一致（{len(other)} 腳）")
+
+
 def main():
     rows = list(csv.DictReader(io.open(CSV, encoding="utf-8")))
+    cross_check(rows)
     assigned = set()
     units = []
     for title, pred in UNITS:

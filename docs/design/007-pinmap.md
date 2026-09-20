@@ -165,6 +165,84 @@ VCC-PD 因 MIPI 而選 1.8V  →  PD bank 上所有腳都是 1.8V
 | Parallel CSI ↔ RMII | PE0 ~ PE9 | **砍掉 CSI**，攝影機走 USB UVC |
 | SPI1 ↔ RGB | PD10 ~ PD15 | SPI1 **只在 MIPI 模式可用** |
 | SPI0 ↔ SPI NOR | PC2 ~ PC7 | SPI0 是備援開機裝置，**不可拉到排針** |
+| **UART0 ↔ SDC0 / RMII** | **PF2 / PF4** | **2 顆 0Ω 分支到 CH340N**，見 §5.2 |
+| **SPI0 ↔ BOOT-SEL strap** | **PC4 / PC5** | 上下拉電阻決定開機來源，見 §5.3 |
+| **JTAG ↔ SDC0** | PF0 / PF1 / PF3 / PF5 | 放棄 JTAG，改留 4 個測試點（成本 $0） |
+
+### 5.1 ⚠ PB0 / PB1 在 eLQFP128 上不存在
+
+從 `tools/t113s3_pins.csv`（Table 4-2 實抽）確認：
+
+```
+GPIOB 只有 6 支   79:PB7  80:PB6  82:PB5  84:PB4  85:PB3  86:PB2
+```
+
+**沒有 PB0、PB1。** §6.3 原本寫的「PB0~PB1 → UART0 → CH340N（console）⚠ 腳位待確認」
+不是待確認，是**那兩支腳沒有被引出來**。
+
+### 5.2 UART0 沒有獨立腳位 —— 這塊板的生命線衝突
+
+Table 4-3 裡 UART0 只有兩組 mux，兩組都撞到別人：
+
+```
+PE2 / PE3   UART0-TX/RX  ←→  RGMII-RXD1 / RGMII-TXCK (RMII)   撞乙太網路
+PF2 / PF4   UART0-TX/RX  ←→  SDC0-CLK / SDC0-D3              撞 microSD
+```
+
+**而 BROM 的 debug log 寫死走 UART0**，改不了。004-usb-boot.md 把它列為 bring-up 生命線。
+
+**決定：走 PF2 / PF4，用 2 顆 0Ω 分支到 CH340N。**
+
+理由是這兩個功能**在時間上本來就不重疊**：
+
+```
+BROM 階段      PF2/PF4 = UART0    印開機 log     ← CH340N 收得到
+切到 SD 讀卡    PF2/PF4 = SDC0     跑 50MHz 時脈  ← CH340N 收到亂碼（正常，非故障）
+Linux 起來後    console 改用 UART1（PG13/PG15 或 PG7/PG8）
+```
+
+0Ω 的作用是**必要時能完全斷開**：CH340N 的輸入電容（~5~10pF）掛在 50MHz 的 SDC0-CLK 上，
+理論上 SD 高速模式可能受影響。SD 跑不穩時拆掉 0Ω 即可定位。
+
+⚠ 0Ω 焊盤距主幹 **≤0.5mm**，與 PD0~PD9 那 10 顆同一條規則（見 005-stackup.md §3）。
+
+**不選 PE2/PE3 的理由**：RMII 需要 PE0~PE9 連續 7 條訊號 + MDC/MDIO，抽掉兩條就不能用，
+而乙太網路是 TFTP+NFS 開發循環的基礎（003-network.md §1）。
+
+**為什麼不把 microSD 移到 SDC1（PG0~PG5）**：
+
+```
+SDC0   PF0~PF5    ← BROM 原生開機裝置
+SDC1   PG0~PG5    ← 通常給 SDIO 週邊，BROM 一般不從這裡開機
+SDC2   PC2~PC7    ← 與 SPI0 共用，已給 SPI NOR
+```
+
+把 SD 移到 PG 會同時失去「BROM 能開機」和「排針 6 支腳」，兩頭皆輸。
+
+### 5.3 PC4 / PC5 同時是 BOOT-SEL strap
+
+```
+PC4   SPI0-MOSI   SDC2-D2   BOOT-SEL0
+PC5   SPI0-MISO   SDC2-D1   BOOT-SEL1
+```
+
+**SPI NOR 的 MOSI/MISO 腳同時是開機來源的 strap pin。** BROM 上電時讀這兩支的電平
+決定從哪個裝置開機，之後才切成 SPI 功能。
+
+⚠ 原理圖階段必須確認：SPI NOR 本身的輸入阻抗、以及是否需要外加上下拉電阻，
+才能保證 strap 電平正確。**這是「上電瞬間的電平」問題，不是「訊號完整性」問題** ——
+量測時要抓上電那一刻，不是穩態。
+
+### 5.4 JTAG 讓給 SD 卡
+
+```
+PF0 = JTAG-MS    PF1 = JTAG-DI    PF3 = JTAG-DO    PF5 = JTAG-CK
+```
+
+PF bank 給 SDC0 之後 JTAG 就沒了。**對 Linux 板影響不大**（靠 UART + FEL 就能除錯，
+JTAG 還要額外的 debugger 硬體）。
+
+**做法：在這 4 支腳旁放 4 個測試點**，需要時飛線接。成本 $0，保留退路。
 
 ---
 
@@ -207,10 +285,13 @@ CSI 砍掉後 PE bank 單純化。**PE11~PE13 保留為 PHY RESET / LED 控制�
 
 ```
 PF0 ~ PF5    SDC0 → microSD（主要開機）
+             ├ PF2 / PF4 另經 2 顆 0Ω 分支到 CH340N（UART0 console）  → §5.2
+             └ PF0 / PF1 / PF3 / PF5 旁放 4 個 JTAG 測試點           → §5.4
 PF6          備用
 PC2 ~ PC7    SPI0 → SPI NOR 16MB（備援開機）
-PB0 ~ PB1    UART0 → CH340N（console）      ⚠ 腳位待確認
+             └ ⚠ PC4 / PC5 同時是 BOOT-SEL strap                    → §5.3
 PB2 ~ PB7    I2S2 音訊 codec / TWI 備用
+             └ ⚠ 沒有 PB0 / PB1，此封裝未引出                       → §5.1
 ```
 
 #### ⚠ PB2~PB7 同時是 RGB888 缺的那 6 個 bit —— 這是一個被放棄的選項

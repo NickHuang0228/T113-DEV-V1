@@ -575,6 +575,104 @@ RTL8201F   QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias      直接用
 
 ---
 
+## 2026-09-19 · 128 腳位表抽出來了，並且炸出三個新衝突
+
+### 先解決「Table 4-2 不可用」
+
+前面記的是「Table 4-2 Pin Characteristics，ball# 與 pin name 完全對不上，不可用」。
+**問題不在 datasheet，在抽取方法。**
+
+```
+pdftotext -layout / get_text()   依文字座標重建欄位  → 欄寬一變就跑位
+page.find_tables()               依繪製的線框切格子  → 欄位不會跑位
+```
+
+用 `find_tables()` 一次抽出 **128 列，無缺號、無重複**，而且與先前人工核的數字完全吻合：
+
+```
+I/O 72 + AI 17 + AO 8 + A I/O 4 + I,OD 1 = 102    ← 對上「I/O 102」
+Power 24（含 DDR 3）+ Ground 1 + NC 1 = 26         ← 對上「Power 21 + DDR 3 + GND 1 + NC 1」
+```
+
+產出 `tools/t113s3_pins.csv`（pin / name / type / reset / pull / drive / supply / group）。
+這張表是 KiCad 符號的直接輸入，也是之後所有腳位爭議的唯一真相來源。
+
+**規則升級**：原本是「定位靠文字，定案靠看圖」。現在中間多一層 ——
+**有線框的表格用 `find_tables()`，沒線框的才退回看圖。**
+
+### 炸出來的三個衝突
+
+拿這張表去對 007 的 bank 草案，三處對不上：
+
+**① PB0 / PB1 根本不存在**
+
+```
+GPIOB 只有 6 支：PB2 ~ PB7
+```
+
+007 §6.3 寫的「PB0~PB1 → UART0 → CH340N ⚠ 腳位待確認」——
+不是待確認，是**那兩支腳這個封裝沒引出來**。
+
+**② UART0 沒有獨立腳位 —— 而它是 bring-up 生命線**
+
+Table 4-3 裡 UART0 只有兩組 mux，兩組都撞人：
+
+```
+PE2 / PE3   ←→  RGMII-RXD1 / RGMII-TXCK (RMII)   撞乙太網路
+PF2 / PF4   ←→  SDC0-CLK / SDC0-D3              撞 microSD
+```
+
+而 **BROM 的 debug log 寫死走 UART0**，改不了。
+
+決定走 **PF2/PF4 + 2 顆 0Ω 分支到 CH340N**。關鍵理由是這兩個功能**在時間上不重疊**：
+
+```
+BROM 階段     PF2/PF4 = UART0   印開機 log      ← CH340N 收得到
+切到 SD 後    PF2/PF4 = SDC0    50MHz 時脈      ← CH340N 收到亂碼（正常）
+Linux 起來    console 改用 UART1（PG13/PG15）
+```
+
+0Ω 的作用是「SD 跑不穩時能一刀切開定位」，不是常態拆裝。
+**這是本專案第二次用 0Ω 隔離解 mux 衝突**（第一次是 PD0~PD9 的 MIPI/RGB）。
+
+不選 PE2/PE3：RMII 要 PE0~PE9 連續，抽兩條就廢，而乙太是 TFTP+NFS 開發循環的基礎。
+不把 SD 移到 SDC1(PG0~PG5)：BROM 一般不從 SDC1 開機，會同時失去「能開機」和「排針 6 支」。
+
+**③ PC4 / PC5 同時是 BOOT-SEL strap**
+
+```
+PC4   SPI0-MOSI   SDC2-D2   BOOT-SEL0
+PC5   SPI0-MISO   SDC2-D1   BOOT-SEL1
+```
+
+SPI NOR 的 MOSI/MISO 腳，同時決定 BROM 從哪裡開機。
+**這是「上電瞬間的電平」問題，不是訊號完整性問題** —— 量測要抓上電那一刻，不是穩態。
+原理圖階段必須確認 SPI NOR 的輸入阻抗與是否需要外加上下拉。
+
+### 順帶收掉一項：JTAG
+
+PF bank 給 SDC0 之後，PF0/PF1/PF3/PF5 的 JTAG 功能就沒了。
+對 Linux 板影響不大（UART + FEL 就夠，JTAG 還要額外 debugger）。
+
+**做法：那 4 支腳旁放測試點，需要時飛線。成本 $0，保留退路。**
+
+### 這一輪的模式
+
+三個衝突都是同一種形狀：**「我以為某個功能有自己的腳」，實際上它跟別人共用 mux。**
+
+前一輪推翻五個假設時的教訓是「合理 ≠ 查證過」。
+這一輪補上後半句：**查證的單位不是「這個功能存不存在」，是「這個功能佔用哪幾支實體腳、還有誰也要那幾支」。**
+
+datasheet 的 Features 頁會說「6 個 UART、3 個 SMHC、4 個 TWI」，
+但那是 **mux 選項的總數，不是能同時使用的數量**。
+
+### 下一步
+
+```
+[ ] 用 t113s3_pins.csv 產生 KiCad 符號（多 unit，依 bank 分頁）
+[ ] 確認 VCC-IO 供電的 23 支是哪些（目前 PB6+PC6+PF7=19，還有 4 支未歸位）
+[ ] 零件料號逐項查 LCSC（即時價、庫存、Extended 種類數 → 回頭重算 PCBA 費用）
+
 ## 2026-09-20 · 顯示鏈路查證:兩處文件錯誤、兩處規格錯誤、一條漏掉的電源軌
 
 階段 0 剩下的「TCON 數量 / MIPI lane rate / RGB pixel clock 上限」查完了。
@@ -1412,3 +1510,90 @@ kicad-cli sch export netlist  ──▶  讓 KiCad 自己算出 net
 [ ] VCC-DRAM / VDD-CORE 實際電流 → 回填 6W 的帳
 [ ] ADV7511 footprint 1:1 列印比對
 ```
+
+---
+
+## 2026-09-21 · 合併另一條開發線:兩種方法抽出來的 128 腳完全一致
+
+push 被擋,遠端有一個 09-19 的 commit(`a78672f`)沒拉下來 ——
+**跟我今天做的腳位表直接重疊。**
+
+### 先做最有價值的事:交叉驗證
+
+在合併之前,先把兩份表比對:
+
+```
+他的   page.find_tables() 機器抽 Table 4-2(依繪製線框切格子)
+我的   目視抄 Figure 7-1 Pin Map(向量圖,900 dpi render 逐腳看)
+```
+
+```
+128 腳全部一致,零不一致
+唯一差異是我多一列 pin 129 = EPAD —— Table 4-2 本來就不列它
+```
+
+**兩種完全獨立的方法、零分歧。** 這比任何單一方法的自我檢查都強 ——
+我的統計驗證(與 §4.1 Pin Quantity 五項對帳)驗不出「兩腳互換」,
+但兩份獨立來源逐腳比對可以。
+
+### 我原本的判斷有一半是錯的
+
+我在 010 §2 寫「Figure 7-1 的標籤是向量圖不是文字,只能用看的」。
+那句對 Figure 7-1 成立,但我沒想到還有 Table 4-2 這條路。
+
+對方那條線的突破是:**Table 4-2 先前被記為「欄位錯位、不可用」——
+問題不在 datasheet,在抽取方法。**
+
+```
+get_text()      依文字座標重建欄位  → 會跑位
+find_tables()   依繪製線框切格子    → 不會
+```
+
+**規則升級:有線框的表格先用 find_tables(),沒線框的才退回看圖。**
+
+我花了一堆時間裁切 render 逐腳目視,如果先試 find_tables() 會快很多。
+「定位靠文字,定案靠看圖」這條規則我用得太寬 —— **它適用於純向量圖,
+不適用於有線框的表格。**
+
+### 還炸出三個 mux 衝突(我完全沒查到)
+
+```
+① PB0 / PB1 在 eLQFP128 上根本沒引出 —— GPIOB 只有 PB2~PB7
+   007 原本寫「PB0~PB1 → UART0 ⚠ 腳位待確認」,不是待確認,是不存在
+② UART0 沒有獨立腳位 —— PE2/PE3 撞 RMII、PF2/PF4 撞 SDC0,
+   而 BROM 的 log 寫死走 UART0
+   決定:PF2/PF4 + 2 顆 0Ω 分支到 CH340N(兩者時間上不重疊)
+③ PC4 / PC5 同時是 BOOT-SEL strap —— 上電瞬間電平決定開機來源
+```
+
+**教訓(對方寫的,我完全同意):**
+Features 頁寫的「6 個 UART、3 個 SMHC」是 mux 選項總數,不是能同時用的數量。
+查證單位是「佔用哪幾支實體腳、還有誰要那幾支」。
+
+我做符號的時候只驗了「腳位名稱對不對」,**完全沒驗「這些功能能不能同時用」**。
+符號正確 ≠ 設計可行。
+
+### 合併處理
+
+```
+docs/design/007-pinmap.md   自動合併成功,且無矛盾
+                            (§6.3 已反映 PF2/PF4 決定,我的 RGB888 段落併在後面)
+notes/devlog.md             衝突 —— 兩邊都在結尾追加
+                            按日期解:他的 09-19 在前,我的 09-20 起在後
+```
+
+### 兩份腳位表暫時共存,但加了防呆
+
+```
+tools/t113s3_pins.csv              機器抽,欄位豐富(reset/pull/drive_mA/supply/group)
+hardware/data/T113-S3_pinmap.csv   我的,含 EPAD、KiCad 電氣型別、mux 註記
+```
+
+**兩個真實來源是會長歪的。** 還沒時間合併,所以在 `gen_t113_symbol.py` 裡
+加了自動交叉檢查 —— 每次生成符號都比對兩份,不一致就中止生成。
+
+```
+✓ 與 tools/t113s3_pins.csv 交叉檢查一致(128 腳)
+```
+
+**明天第一件事:合併成單一來源**,以機器抽取為底,疊上 KiCad 需要的欄位。
