@@ -428,7 +428,7 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [ ] VDD18-DRAM (pin 50) 接內建 LDOA 還是外部 1.8V
 - [ ] ADV7511 的 RESET# 要接 GPIO（MIPI 模式時保持 reset）
 - [ ] ★ **取得 ADV7511 機構圖與 Video Input AC Timing** —— 目前的阻塞項
-- [ ] 1.2V LDO 選型（3.3V→1.2V，≥100mA，SOT-23）+ LCSC 料況
+- [x] 1.8V LDO 選型 → **AP2112K-1.8TRG1 (C176944, 600mA, $0.17)**；XC6206 的 200mA 不夠
 - [ ] ⚠ **ADV7511 封裝機構圖未取得**（ADI 官網 PDF 擋 curl/WebFetch，要手動下載）
 - [x] RTL8201F 封裝機構圖 → QFN-32 5×5，pitch 0.5，EPAD 3.35×3.35 `(RTL DS §10.1, p.55, JEDEC MO-220)`
 - [x] VCC-PD / VCC-PE / VCC-PG → **全部 3.3V**（見 001-power.md §1.1）
