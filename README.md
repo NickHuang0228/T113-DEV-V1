@@ -14,7 +14,7 @@
 | | ESP32S3-DEV-V1 | **T113-DEV-V1** |
 |---|---|---|
 | 主晶片 | ESP32-S3 模組 | **T113-S3 裸晶片** |
-| 電源域 | 1 組 | **4 組**（外部 3.3/1.5/0.9V + 晶片內建 1.8V LDO） |
+| 電源域 | 1 組 | **5 組**（3.3 / 1.5 / 0.9 / 1.8 / 1.2V） |
 | 差分對 | 1 對（USB FS 12Mbps） | **9 對**（USB HS / TMDS / MIPI / RMII） |
 | 阻抗控制 | 無 | **必須** |
 | 作業系統 | MicroPython | **Linux（自己 bring up）** |
@@ -28,12 +28,13 @@
 
 ```
 主晶片   Allwinner T113-S3
-         2× Cortex-A7 @1.2GHz + RISC-V C906 + HiFi4 DSP
+         2× Cortex-A7 + HiFi4 DSP        ⚠ 無 GPU、無 RISC-V C906（見 SPEC 勘誤）
          內建 128MB DDR3（SIP 封裝，不需自行 layout DDR）
 
 顯示     MIPI DSI 4-lane  FPC 座
-         RGB 並列 → IT66121 → HDMI Type-A
-         （共用同一組 TCON，dts 二選一）
+         RGB666 並列 → IT66121 → HDMI Type-A
+         （共用 TCON_LCD 且共用 PD0~PD9 實體腳，10 顆 0Ω 切換）
+         pixel clock 上限：SoC 200MHz / IT66121 165MHz → 1080p60 可行
 
 網路     RMII → RTL8201F → RJ45 HR911105A（整合式含變壓器）
          WiFi 不做（SDIO 會吃掉 PG bank 6 支腳），要無線插 USB dongle

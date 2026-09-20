@@ -572,3 +572,150 @@ RTL8201F   QFN-32-1EP_5x5mm_P0.5mm_EP3.3x3.3mm_ThermalVias      直接用
 
 真正要小心的只剩兩件:T113 的 EPAD 選錯組別,以及 RTL8201F 拿錯封裝章節。
 兩件都已寫進 008-footprint.md 的驗收清單。
+
+---
+
+## 2026-09-20 · 顯示鏈路查證:兩處文件錯誤、兩處規格錯誤、一條漏掉的電源軌
+
+階段 0 剩下的「TCON 數量 / MIPI lane rate / RGB pixel clock 上限」查完了。
+結果不只補上三個數字,還翻出五個問題。
+
+### 1. 我自己的文件把 R 和 B 標反了
+
+002-display.md v0.2 寫:
+
+```
+LCD0-D2 ~ D7    PD0 ~ PD5    R[7:2]      ✗
+LCD0-D18 ~ D23  PD12 ~ PD17  B[7:2]      ✗
+```
+
+UM Table 5-2 (p.399) 明講 parallel RGB 是 **high-aligned**:
+
+```
+D23..D18 = R5..R0     D15..D10 = G5..G0     D7..D2 = B5..B0
+```
+
+套上 Table 4-3 的 PD bank 對應,正確答案是 **PD0~PD5 = B、PD12~PD17 = R**,
+而且 bit 序也反了 —— PD0 是 B0(LSB),不是 MSB。
+
+**但這個錯誤在接線時不會爆** —— 因為 IT66121 的輸入腳也叫 `D[23:0]`,
+也是 high-aligned。按 D 編號 1:1 接就自動對。
+
+所以規則是:**原理圖一律標 `LCD0-D` 編號,不標顏色名稱。**
+用顏色名稱轉譯一次,就多一次 R/B 對調的機會。
+
+### 2. 「T113-S3 沒有 RGB888」—— 也是我寫錯的
+
+v0.2 斷言晶片只到 RGB666,依據是「D0/D1/D8/D9/D16/D17 在 PD bank 上不存在」。
+前半句對,結論錯 —— 那 6 支在 **PB2~PB7 的 Function2**。
+
+UM Table 5-2 有完整 RGB888 欄,Table 5-4 與 DS Table 5-18 註(5) 都寫 24-bit。
+
+**T113-S3 支援 RGB888,是我們選擇不用。** 理由是 PB 在 VCC-IO 上,
+那條軌掛著 microSD + SPI NOR + UART0 console,為了 1.2% 色深把 6 條
+148MHz 的線拉進命脈 bank,不划算。
+
+**「晶片做不到」和「我們不做」是兩回事,文件裡不能混。**
+
+### 3. pixel clock 上限:grep 用錯關鍵字會整張表漏掉
+
+找了半天沒找到 LCD 的時脈上限,一度寫進文件說「全志沒公布」。錯的。
+
+```
+DS §5.11.1 Table 5-18  DCLK cycle time  tDCLK  Min 5 ns   →  200 MHz
+DS §5.11.2 Table 5-19  Pclk frequency          Max 148.5 MHz  ← 這是 CSI 輸入
+```
+
+兩張表連在一起。**搜 `MHz` 只會撞到 CSI 那張,因為 LCD 那張用 `ns` 表示。**
+
+這是「抽出來的文字用來定位,不用來定案」的第四次命中,而且是新的一種:
+前三次是抽取失真,**這次是搜尋關鍵字本身有偏差 —— 同一個物理量,兩張表用不同單位寫。**
+
+以後查上限值,`MHz` 和 `ns`(還有 `Gbps` / `UI`)要一起搜。
+
+結論:
+
+```
+T113-S3 TCON_LCD   200 MHz
+IT66121            165 MHz     ← 瓶頸在這
+1080p@60 需要      148.5 MHz   兩邊都過
+```
+
+### 4. 等長根本不是風險,ROADMAP 的定性要下修
+
+有了 IT66121 的真實數字就能算了:
+
+```
+TS 1.5ns + TH 0.7ns,TPJ 2.0ns max     (IT66121 DS p.17)
+148.5MHz → Tpixel 6.734 ns
+6.734 − 1.5 − 0.7 = 4.53 ns
+保守留 3.5ns 給 SoC skew + jitter → PCB 還有 ~1ns = 149mm
+```
+
+**100×100mm 的板子上,兩條走線差不到 149mm。** 等長在物理上不可能成為瓶頸。
+
+ROADMAP 風險 ⑤ 原本寫「RGB 並列等長」,改成「RGB 並列的 SSO noise」——
+地彈會直接吃掉 IT66121 那 2.0ns 的 jitter 預算,那才是 148.5MHz 下會出事的路徑。
+
+### 5. ⚠ 最嚴重的一項:IT66121 要 1.2V,規格書漏了兩個版本
+
+```
+IVDD12  pin 8,35,56   核心邏輯
+PVCC12  pin 18        HDMI PLL        "should be regulated"
+AVCC12  pin 23        類比前端        "should be regulated"
+DVDD12  pin 28        數位前端
+VCCNOISE              Max 100 mVpp
+```
+
+**全板電源域從 4 組變 5 組。** 如果沒查出來,板子回來才發現 IT66121 少一條電源軌 ——
+那是要飛線的等級。
+
+對照組:RTL8201F 有內建 1.1V LDO,只吃 3.3V,而且 datasheet 明講外部核心電源
+「not suggested,internal regulators cannot be disabled」。
+
+**同樣是周邊 IC,一顆自帶 LDO,一顆沒有。**
+教訓:每顆 IC 都要開 Power/Ground Pins 那一頁逐腳看,不能假設「3.3V 單軌」。
+這條加進 ROADMAP 風險 ⑦。
+
+### 6. 順手抓到:T113-S3 沒有 GPU,也沒有 RISC-V C906
+
+SPEC 寫 `GPU Mali-G31 MP2` 和 `RISC-V C906 @1.0GHz`。
+DS + UM 兩份文件搜 `Mali` / `GPU` / `OpenGL` / `Vulkan` / `RISC-V` / `C906` —— **零命中**。
+
+```
+DS §1 p.3    "integrates dual-core Cortex-A7 CPU and single-core HiFi4 DSP"
+DS §2.1 p.3  "Dual-core ARM Cortex-A7"  —— 就這一行
+DS 方塊圖 p.20  只有 DE / DI / G2D,沒有 3D 引擎
+```
+
+這兩項是從同門晶片抄來的(D1/D1s 有 C906,A133/T507 有 Mali-G31)。
+
+**後果是驗收標準要改**:沒有 GPU 代表顯示堆疊只有 framebuffer/DRM-KMS + G2D,
+沒有 OpenGL ES。「HDMI 出畫面」= 測試圖樣或影片解碼,**不是桌面環境**。
+
+另外 datasheet 全文搜 `GHz` 零命中 —— `@1.2GHz` 也是市場資料,不是規格書數字。
+
+### 7. 附帶收掉的三個待決事項
+
+```
+VCC-PE  → 3.3V   RTL8201F 數位 IO 只吃 DVDD33,無獨立 VDDIO,1.8V 過不了 VIH
+VCC-PD  → 3.3V   IT66121 的 OVDD 三種電壓皆可,不構成限制
+                 MIPI D-PHY 吃 VCC-LVDS(pin 65,MangoPi 標 "LVDS1.8")而非 VCC-PD
+VCC-PG  → 3.3V   v0.2 已定
+```
+
+**全板 IO 單一 3.3V 電平,不需要任何電平轉換。**
+
+VCC-PD 那一條的推論(D-PHY 吃 VCC-LVDS)datasheet 沒有明文,
+依據是「整顆晶片的電源腳裡沒有任何 DSI 專用軌」的排除法 ——
+已留在 001-power.md §2.2.2 的待確認清單,要找一份真的接 DSI 面板的參考設計核對。
+
+### 方法筆記
+
+這次五個問題裡,**三個是我自己先前寫錯的**(R/B 標反、RGB888 斷言、「沒公布上限」),
+兩個是抄來的規格沒查證(GPU、C906)。
+
+共同點:**都是「看起來已經確認過」的欄位。** 打了勾的項目沒有再被質疑。
+
+規則補一條:**驗收清單上的 `[x]` 要標出處頁碼。** 沒有頁碼的勾等於沒查。
+這次能抓出來,是因為為了查 TCON 又把 §5 和 §2.6 重讀了一遍。

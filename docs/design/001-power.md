@@ -1,6 +1,6 @@
 # 001 · 電源樹與上電時序
 
-版本：v0.2 · 2026-09-18（依 datasheet 重寫，取代 v0.1 的估算值）
+版本：v0.3 · 2026-09-20（查完 IT66121 / RTL8201F 電氣規格：多一條 1.2V 軌，VCC-PE / VCC-PD 電壓定案）
 
 **資料來源**：`T113-S3_Datasheet_v1.6_20220303.pdf`，以下標註格式為 `(DS §5.3 p.45)`。
 交叉驗證對象：`MangoPi_MQ-R_sch_v1.6.pdf`（分壓值已驗算，見 §2.4）。
@@ -26,6 +26,7 @@
 | | VCC-TVOUT | CVBS 輸出 |
 | | LDO-IN | 內部 LDOA/B 的輸入（Max 3.6） |
 | **1.8 或 3.3 V** | VCC-PD / VCC-PE / VCC-PG | GPIO bank，**可選**（VCC-PE 另支援 2.8V） |
+| **1.2 V** | **IT66121** IVDD12 / AVCC12 / PVCC12 / DVDD12 | **HDMI 橋接晶片核心與類比**（v0.3 新增，見 §1.2） |
 | **5 V** | — | USB-A Host 直通（含限流） |
 
 > ⚠ v0.1 寫的 `VDD_CPU / VDD_SYS = 1.1V` 是錯的，datasheet Typ 是 **0.9 V**。
@@ -52,7 +53,61 @@ LAN8720   1.8 ~ 3.3 V
 IP101GR   2.5 / 3.3 V
 ```
 
-**決策歸屬 002-display.md 與 003-network.md，但必須在畫原理圖前定案。**
+#### ✅ v0.3 定案
+
+| Bank | 電壓 | 依據 |
+|---|---|---|
+| **VCC-PE** | **3.3 V** | RTL8201F 的數位 IO 只吃 `DVDD33 = 3.3V±10%`，**沒有獨立 VDDIO 腳**，1.8V 會過不了 VIH `(RTL8201F DS §9.1.2 Table 47, p.44)` |
+| **VCC-PD** | **3.3 V** | IT66121 的 OVDD 可選 1.8/2.5/3.3V，對電壓無要求；MIPI D-PHY 的類比電源是 VCC-LVDS 而非 VCC-PD（見 §2.2.2），所以 MIPI 側也不綁。選 3.3V 換 IT66121 `VIH=2.0V` 的餘裕，並與排針借用的 PD10~PD13 電平一致 |
+| **VCC-PG** | **3.3 V** | 已於 007-pinmap.md v0.2 定案 |
+
+```
+[ ] 殘留風險：VCC-PD = 3.3V 時 MIPI 模式是否仍正常
+     推論依據是「D-PHY 吃 VCC-LVDS」，datasheet 沒有明文
+     → 找一份真的有接 DSI 面板的 T113/D1 參考設計核對 VCC-PD 接法
+```
+
+### 1.2 ⚠ 漏掉的第五條軌：IT66121 的 1.2V
+
+`(IT66121FN DS p.7 Power/Ground Pins；p.14 Functional Operation Conditions)`
+
+```
+IVDD12  pin 8, 35, 56    核心邏輯          1.14 / 1.2 / 1.26 V
+PVCC12  pin 18           HDMI PLL          ⚠ "should be regulated"
+AVCC12  pin 23           HDMI 類比前端      ⚠ "should be regulated"
+DVDD12  pin 28           HDMI 數位前端
+
+VCCNOISE   Max 100 mVpp                    ← 雜訊要求比一般數位軌緊
+全片功耗    < 70 mW @1080p60  (DS p.3)     → 1.2V 電流估 < 50 mA
+```
+
+**規格書原本寫「4 組電源域」是錯的，實際 5 組。**
+
+`RGB → IT66121 → HDMI` 這條路只在 datasheet 的功能描述層看，看不出它自帶一條核心電壓軌。
+**查周邊 IC 的電源腳，必須逐顆開 Power/Ground Pins 那一頁，不能假設「3.3V 單軌」。**
+
+實作：
+
+```
+3.3V ──[LDO]──▶ 1.2V ──┬──▶ IVDD12 (×3)、DVDD12
+                        ├──[磁珠]──▶ PVCC12   + 0.1µF + 10µF
+                        └──[磁珠]──▶ AVCC12   + 0.1µF + 10µF
+
+選 LDO 不選 DC-DC：VCCNOISE 只有 100 mVpp，切換漣波不值得冒險
+壓降 2.1V × 50 mA ≈ 105 mW，SOT-23 散得掉
+```
+
+### 1.3 RTL8201F 不需要額外電源軌
+
+`(RTL8201F DS §8.8 p.38)`
+
+```
+核心 1.1V 由晶片內建 LDO 從 3.3V 產生
+"The external 1.05V power supply is not suggested ... the internal regulators cannot be disabled"
+→ DVDD10 / DVDD10OUT / AVDD10OUT 只掛 0.1µF X5R 低 ESR 電容，不外接電源
+```
+
+**RTL8201F 全板只吃 3.3V。** 與 IT66121 相反 —— 同樣是周邊 IC，一顆自帶 LDO，一顆沒有。
 
 ---
 
@@ -133,11 +188,31 @@ MangoPi 另外放了外部 1.8V LDO。
 
 MIPI DSI 走 PD0~PD9，該 bank 的 **IO buffer 電源是 VCC-PD** `(DS Table 4-2 Power Supply 欄)`。
 
-D-PHY 的類比電源推測是 **VCC-LVDS（1.8V，Max 50 mA）** —— 因為 LVDS0 與 DSI
-共用同一組腳、同一個 PHY 區塊，且 Table 5-3 只有 VCC-LVDS 這一項與該 PHY 相關。
+D-PHY 的類比電源推測是 **VCC-LVDS（1.8V，Max 50 mA）**。v0.3 補上兩項佐證：
+
+**① 整顆晶片的電源腳裡沒有任何 DSI 專用軌** `(DS Table 4-2, p.34-37)`
 
 ```
-[ ] 待確認：開 p.77 Pin Map 目視，確認 VCC-LVDS 的腳位位置與 PD bank 的關係
+AVCC · VCC-DRAM0/1 · VCC-IO · VCC-LVDS · VCC-PD · VCC-PE · VCC-PG · VCC-RTC · VDD18-DRAM
+（另有 VDD-CORE / VDD-SYS / VCC-PLL / VCC-TVOUT / VCC-TVIN）
+```
+
+沒有 `VCC-DSI` / `VDD-MIPI`。DSI 與 LVDS 共用 PD0~PD9 的實體 pad，
+**VCC-LVDS 是唯一可能的類比供電來源。**
+
+**② VCC-LVDS 是獨立的腳位（pin 65），不是 VCC-PD 的一部分**
+
+```
+DS Table 4-2         PD22 之後緊接 pin 65 = VCC-LVDS
+MangoPi sch v1.6     pin 64 = PD9 ／ pin 65 標示 "LVDS1.8" ／ pin 66 = VCC-PD
+```
+
+**推論：MIPI D-PHY 吃 VCC-LVDS (1.8V)，VCC-PD 只供 RGB 模式的數位 IO buffer。**
+所以 VCC-PD 可以選 3.3V 而不影響 MIPI —— 這是 §1.1 定案的依據。
+
+```
+[ ] 仍待確認：此推論 datasheet 無明文，找一份真接 DSI 面板的 T113/D1 參考設計核對
+[ ] 待確認：4-lane 全速時 VCC-LVDS 實際電流（Table 5-3 只給「700MHz 雙鏈路 LVDS」的 50 mA）
 ```
 
 ### 2.3 電源 IC：三種選擇
@@ -260,6 +335,14 @@ LDOB-OUT        2.2 µF（即使不使用也要掛，MangoPi C50）
 
 MangoPi 在 AVCC1.8 上用了 **75R 串聯電阻 + LC** 做類比隔離，值得抄。
 
+**IT66121 的 1.2V 另有專門要求** `(IT66121 DS p.15 note 2)`：
+
+```
+AVCC12 / PVCC12 / PVCC33   各自用磁珠或串聯電阻從幹線隔開 + 0.1µF + 10µF
+REXT (pin 20)              5.6kΩ 1% 接 AGND —— 這顆決定 TMDS 輸出擺幅，不可省
+ENTEST (pin 31)            經電阻接地
+```
+
 **注意 DC bias**：上一塊板學到的教訓 —— MLCC 在偏壓下容值會掉。
 
 ```
@@ -303,7 +386,7 @@ VDD-CORE / VDD-SYS / VCC-DRAM / VCC-TVIN / AVCC   全部 TBD
 ```
 T113-S3 全速（2×A7 @1.2GHz）  ~1.5 W  → 5V 端約 350 mA（效率 85%）  ⚠ 估算，datasheet TBD
 3.3V GPIO（最壞情況全切換）     432 mA @3.3V = 1.43 W → 5V 端約 340 mA
-IT66121（HDMI 工作中）         ~0.5 W  → 5V 端約 120 mA
+IT66121（HDMI 工作中）         <0.07 W → 5V 端約 20 mA   (DS p.3「< 70mW @1080p60」)
 RTL8201F（100M link up）       ~0.3 W  → 5V 端約  70 mA
 SD / SPI NOR / 被動            ~0.2 W  → 約 50 mA
 USB-A Host 對外                5V × 500 mA = 2.5 W
@@ -447,7 +530,9 @@ B. 背面 via 補焊
 [ ] 上兩項合計是否超過 LDOA 的 260 mA → 決定要不要外部 1.8V
 [ ] RY1303 的 LCSC 料況 → 決定三路 DC-DC 或分離式 ×3
 [ ] MangoPi 的 RESET 腳實際有無電容、多大 → 決定要不要加 reset supervisor
-[ ] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 還是 3.3V（與 IT66121、RTL8201F 電平對齊）
+[x] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 還是 3.3V → **三者全選 3.3V**（見 §1.1）
+[ ] 1.2V LDO 選型（3.3V→1.2V，≥100 mA，SOT-23）+ LCSC 料況
+[ ] VCC-PD = 3.3V 時 MIPI 是否正常 —— 找有接 DSI 面板的參考設計核對
 [ ] Table 5-2 / 5-3 的數字回 p.45-48 原頁目視核對（pdftotext 欄位有錯位）
 ```
 
@@ -459,6 +544,7 @@ B. 背面 via 補焊
 [ ] 上電前先量各軌對地電阻，確認沒有短路
 [ ] 3.3V / 1.5V / 0.9V 三軌電壓，誤差 <±3%
 [ ] 若用內部 LDOA，量 LDOA-OUT (pin 28) 是否為 1.8V
+[ ] IT66121 的 1.2V 軌電壓在 1.14~1.26V 內，漣波 <100 mVpp（AC 耦合，這條規格比別條緊）
 [ ] 四通道示波器抓上電時序：3.3V → 0.9V 間隔 > 2 ms，末軌 → RESET 釋放 > 64 ms
 [ ] 各軌漣波（AC 耦合，20MHz 頻寬限制），目標 <50 mV pp
 [ ] 總電流（待機 / 全速 / 插 USB 裝置）

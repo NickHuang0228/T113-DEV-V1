@@ -1,8 +1,32 @@
 # 002 · 顯示介面：MIPI DSI 與 RGB→HDMI
 
-版本：v0.2 · 2026-09-18（查完 pin mux 表後重寫架構，v0.1 的假設是錯的）
+版本：v0.3 · 2026-09-20（查完 UM §5 TCON 章節與 IT66121 電氣規格；v0.2 的 R/B 標反、「沒有 RGB888」的說法也不對）
 
 **專案優先序：MIPI DSI > RGB/HDMI。** 長期目標是 DSI layout 經驗，HDMI 是附帶。
+
+---
+
+## 0. TCON 有兩組，但給面板的只有一組
+
+階段 0 的待確認項「TCON 數量」查完了。
+
+`(UM §5 Video Output Interfaces, p.397 起；CCU §3.3.6.92 / §3.3.6.94, p.140-142)`
+
+```
+§5.1  TCON LCD   暫存器 0x0B60 TCONLCD_CLK_REG   →  RGB 並列 / LVDS / MIPI DSI
+§5.2  TCON TV    暫存器 0x0B80 TCONTV_CLK_REG    →  TV Encoder（CVBS OUT）
+```
+
+**RGB、LVDS、MIPI DSI 三者掛在同一個 TCON_LCD 下**（MIPI DSI 是 UM §5.1.3.12，
+編在 TCON LCD 章節裡面），所以：
+
+```
+v0.1 的「共用同一組 TCON，dts 二選一」  →  ✓ 成立
+§1 的「連接腳也共用」                   →  ✓ 也成立，而且更嚴格
+```
+
+CVBS 有自己的 TCON_TV，理論上可與面板同時輸出（DE 有 main + aux 兩組顯示通道
+`(DS §2.5.1 p.5)`）。**本板不做 CVBS**，這一條只是記錄，免得日後誤以為「只有一個 TCON」。
 
 ---
 
@@ -192,51 +216,183 @@ LT8618SX 在 Linux 上通常要靠廠商 blob 或自己寫 driver。**第一塊�
 
 ### 3.2 RGB 並列走線
 
-### ⚠ T113-S3 的 RGB 最多只到 RGB666，沒有 RGB888
+### ⚠ v0.2 這一節有兩個錯誤，先更正
 
-`(DS Table 4-3 Pin Multiplexing, PD bank)`
+**錯誤 1：R 與 B 標反了。** v0.2 寫 `PD0~PD5 = R`、`PD12~PD17 = B`，實際相反。
+
+**錯誤 2：「T113-S3 沒有 RGB888」不成立。** 晶片有，只是要多借 6 支 PB 腳。
+
+#### 正確對應（兩張表交叉而來）
+
+`(UM §5.1.3.1 Table 5-2 The Correspondence between LCD and RGB, p.399)`
+`(DS Table 4-3 Pin Multiplexing, p.30-31)`
+
+Table 5-2 明講 **parallel RGB 的資料是 high-aligned**（高位對齊），所以：
 
 ```
-LCD0-D2  ~ D7    PD0  ~ PD5    R[7:2]   6 bit
-LCD0-D10 ~ D15   PD6  ~ PD11   G[7:2]   6 bit
-LCD0-D18 ~ D23   PD12 ~ PD17   B[7:2]   6 bit
-LCD0-CLK         PD18
-LCD0-DE          PD19
-LCD0-HSYNC       PD20
-LCD0-VSYNC       PD21
+LCD0-D23..D18  =  R5..R0      LCD0-D15..D10  =  G5..G0      LCD0-D7..D2  =  B5..B0
 ```
 
-**LCD0-D0 / D1 / D8 / D9 / D16 / D17 在 PD bank 上不存在。**
-`(DS §2.6.1 p.6 也只寫 "RGB666 and RGB565 with dither function")`
-MangoPi 原理圖自己的註記也是 `RGB666=PD0~PD21`。
+再套 Table 4-3 的 PD bank Function2：
+
+```
+PD0  = D2  = B0        PD6  = D10 = G0        PD12 = D18 = R0
+PD1  = D3  = B1        PD7  = D11 = G1        PD13 = D19 = R1
+PD2  = D4  = B2        PD8  = D12 = G2        PD14 = D20 = R2
+PD3  = D5  = B3        PD9  = D13 = G3        PD15 = D21 = R3
+PD4  = D6  = B4        PD10 = D14 = G4        PD16 = D22 = R4
+PD5  = D7  = B5        PD11 = D15 = G5        PD17 = D23 = R5
+
+PD18 = LCD0-CLK    PD19 = LCD0-DE    PD20 = LCD0-HSYNC    PD21 = LCD0-VSYNC
+```
+
+```
+PD0  ~ PD5    B[5:0]     ← v0.2 寫成 R，錯
+PD6  ~ PD11   G[5:0]
+PD12 ~ PD17   R[5:0]     ← v0.2 寫成 B，錯
+```
+
+⚠ 注意 bit 順序也反了：**PD0 是 B0（LSB），PD5 才是 B5（MSB）**，
+v0.2 的 `R[7:2]` 寫法暗示 PD0 是 MSB，也是錯的。
+
+#### 但接線時不會踩到這個坑 —— 因為兩顆晶片用同一套 D 索引
+
+IT66121 的視訊輸入腳就叫 `D[23:0]` `(IT66121 DS p.6 Digital Video Input Pins)`，
+而且同樣是 high-aligned。**所以按 D 編號 1:1 接就對了，不必經過顏色名稱：**
+
+```
+T113 LCD0-D23 ──▶ IT66121 D23        （R5）
+T113 LCD0-D18 ──▶ IT66121 D18        （R0）
+T113 LCD0-D15 ──▶ IT66121 D15        （G5）
+   ...
+T113 LCD0-D2  ──▶ IT66121 D2         （B0）
+
+IT66121 D17 / D16 / D9 / D8 / D1 / D0  ──▶ GND
+```
+
+**用顏色名稱接線才會出錯，用 D 索引接線不會。** 原理圖上一律標 D 編號。
+
+⚠ 6 支 LSB 接 GND 的代價：全白只到 `0xFC/0xFF` = 98.8% 滿刻度，實務上看不出來。
+（另一種做法是把 MSB 複製到 LSB 取得真正的 0xFF，但那要在 6 條 RGB 線上多掛分支，
+為了 1.2% 的亮度增加 stub —— 不划算，接 GND。）
+
+#### 為什麼選 RGB666 —— 是取捨，不是晶片限制
+
+缺的 6 個 bit（D0/D1/D8/D9/D16/D17）**在 PD bank 上確實不存在**，
+但它們在 **PB2~PB7 的 Function2** 上 `(DS Table 4-3, p.30)`：
+
+```
+PB2 = LCD0-D0 (B0)     PB4 = LCD0-D8  (G0)     PB6 = LCD0-D16 (R0)
+PB3 = LCD0-D1 (B1)     PB5 = LCD0-D9  (G1)     PB7 = LCD0-D17 (R1)
+```
+
+UM Table 5-2 有完整的 RGB888 欄，Table 5-4 也寫 `D[23..0] 24-bit RGB output`，
+DS Table 5-18 的註 (5) 同樣是 `LD[23..0]: 24Bit RGB/YUV output from input FIFO for panel`。
+**所以 T113-S3 支援 RGB888，代價是 PD0~PD21 之外再吃掉 PB2~PB7。**
+
+本專案仍選 RGB666，理由是 bank 風險而非晶片能力：
+
+```
+PB 在 VCC-IO 上 —— 那條軌同時掛著 microSD、SPI NOR、UART0 console
+把 6 條 148MHz 的 RGB 線拉進命脈 bank，換 1.2% 的色深 → 不划算
+（PB2~PB7 已配給 I2S2 音訊，見 007-pinmap.md §6.3）
+```
+
+**後果：HDMI 輸出是 RGB666（26 萬色）。** 漸層會有可見 banding，
+T113 的 DE 有 dither 可緩解 `(DS §2.6.1 p.6 "RGB666 and RGB565 with dither function")`。
 
 ```
 v0.1 寫    24 資料 + 4 控制 = 28 條單端      ✗
 實際       18 資料 + 4 控制 = 22 條單端      ✓
 ```
 
-**後果：HDMI 輸出的顏色深度是 RGB666（26 萬色），不是 RGB888（1670 萬色）。**
-漸層會有可見的 banding。IT66121 支援 RGB666 輸入，功能上沒問題，
-T113 的 DE 也有 dither 可以緩解。
-
-**這也是「MIPI 優先」的另一個理由 —— MIPI DSI 支援 RGB888，RGB 並列不支援。**
+**MIPI 優先的理由之一仍然成立 —— MIPI DSI 在本板配置下能跑 RGB888，RGB 並列只到 RGB666。**
 
 ```
 訊號數       18 資料 + HS + VS + DE + CK = 22 條單端
-pixel clock  1080p@60 約 148.5 MHz（⚠ 待確認 T113 與 IT66121 的上限）
 解析度上限   RGB 1920×1080@60  /  MIPI DSI 4-lane 1920×1200@60   (DS §2.6 p.6)
 ```
 
-**skew budget 比直覺寬鬆**：
+### ✅ pixel clock 上限：SoC 200 MHz，IT66121 165 MHz —— 瓶頸在橋接晶片
+
+`(DS §5.11.1 Table 5-18 LCD HV_IF Interface Timing Constants, p.61)`
 
 ```
-148.5 MHz → 週期 6.73 ns
-扣掉 setup/hold 各約 1 ns → 約 4.7 ns 給 jitter + skew
+DCLK cycle time    tDCLK    Min 5 ns    →   DCLK max = 200 MHz
+```
+
+```
+T113-S3 TCON_LCD    200 MHz      (DS Table 5-18)
+IT66121FN           165 MHz      (IT66121 DS p.17 Fpixel max)
+1080p@60 所需        148.5 MHz    CEA-861
+                    ───────────
+瓶頸                 IT66121，不是 SoC
+```
+
+功能面的 `up to 1920 x 1080@60fps` `(DS §2.6.1 p.6 / UM §5.1.1 p.397)` 是頻寬結論，
+**接腳時序本身容許到 200 MHz。** 兩個數字不衝突，但引用時要分清楚。
+
+#### ⚠ 陷阱：不要把 148.5 MHz 當成 LCD 的數字
+
+全文搜 `MHz`，148.5 只在三處命中，**全部都是視訊輸入**：
+
+```
+DS §2.7.1 Parallel CSI, p.7                    "Maximum pixel clock of 148.5 MHz"
+DS §5.11.2 Table 5-19 CSI Interface, p.62      Pclk frequency max 148.5 MHz
+UM §6.1 CSIC, p.499                            同一句
+```
+
+LCD 的數字在 **Table 5-18**，CSI 的在 **Table 5-19**，兩張表連在一起。
+**grep 先撞到的是 CSI 那張** —— 因為 LCD 那張只寫 `5 ns`，沒有 `MHz` 字樣。
+
+> 這是專案規則「抽出來的文字用來定位，不用來定案」的第四次命中，而且是新的一種：
+> **搜尋關鍵字本身有偏差 —— 用 `MHz` 去找時脈上限，會漏掉用 `ns` 表示的那一張表。**
+
+時脈鏈的可調範圍 `(UM §3.3.6.92 p.140)`：
+
+```
+TCONLCD_CLK = Clock Source / M / N
+Source ∈ { PLL_VIDEO0(1X/4X), PLL_VIDEO1(1X/4X), PLL_PERI(2X), PLL_AUDIO1(DIV2) }
+PLL_VIDEO0(4X) 預設 1188 MHz   (UM §3.3.6.4 p.76)
+```
+
+⚠ **Table 5-18 沒有給 LCD 輸出的 setup/hold 或 Tco**，只有 cycle time 與時序常數關係。
+所以 T113 側的輸出 skew 仍是未知數 —— 下面的 budget 計算要保留餘量。
+
+### IT66121 側的上限倒是明確
+
+`(IT66121 DS p.2 / Video AC Timing Specification p.17)`
+
+```
+Fpixel   單邊緣取樣   25 ~ 165 MHz      ← 148.5 落在範圍內 ✓
+TS       setup        1.5 ns min
+TH       hold         0.7 ns min
+TPJ      PCLK jitter  2.0 ns max
+TPDUTY   工作週期      40% ~ 60%
+```
+
+⚠ **下限 25 MHz 也是限制**：想跑很低的解析度（例如 480i 原生 13.5 MHz）
+必須靠 IT66121 的 pixel-repeat 把時脈乘上去，不能直接餵。
+
+### skew budget（用 IT66121 的真實數字重算）
+
+```
+148.5 MHz → Tpixel = 6.734 ns
+扣 TS 1.5 ns + TH 0.7 ns                 → 剩 4.53 ns
+給 T113 輸出 skew + 時脈 jitter 留 3.5 ns（保守，因為 DS 沒給 Tco）
+→ 剩 ~1 ns 給 PCB
 FR4 傳播延遲 ~6.7 ps/mm
-→ 等長容忍約 ±100mm（遠比 DDR3 的 ±0.6mm 寬鬆）
+→ 1000 ps / 6.7 ps/mm ≈ 149 mm
 ```
 
-**真正的殺手是 SSO noise（Simultaneous Switching Output）**：24 條線同時翻轉造成的地彈與 EMI。
+**在 100×100mm 的板子上，兩條走線最多也差不到 149mm —— 等長在物理上不可能成為瓶頸。**
+實作時對 CK 等長做到 ±10mm 即可，那是整齊，不是需求。
+
+> ROADMAP 風險 ⑤ 把「RGB 並列等長」列為主要風險，**這個定性要下修**。
+> 等長不是風險，SSO 與 jitter 才是。
+
+**真正的殺手是 SSO noise（Simultaneous Switching Output）**：22 條線同時翻轉造成的地彈與 EMI。
+地彈會直接吃掉 IT66121 那 2.0 ns 的 jitter 預算 —— 這才是 148.5 MHz 下會出事的路徑。
 
 緩解手段：
 
@@ -252,6 +408,51 @@ GND 回流       走線下方必須是完整 GND 平面
 
 ⚠ PD0~PD9 那 10 條的阻尼電阻要放在 **0Ω 之後、靠 IT66121 那側**，
 不能放在主幹上 —— 主幹是 MIPI 的路徑，不能串任何東西。
+
+### 3.2.1 ⚠ IT66121 要 1.2V —— 全板多一條電源軌
+
+`(IT66121 DS p.7 Power/Ground Pins；p.14 Functional Operation Conditions)`
+
+```
+IVDD12    1.2V   pin 8, 35, 56    核心邏輯
+AVCC12    1.2V   pin 23           HDMI 類比前端      ⚠ 註記要求「should be regulated」
+PVCC12    1.2V   pin 18           HDMI PLL           ⚠ 同上
+DVDD12    1.2V   pin 28           HDMI 數位前端
+                                  ───────────────
+VCC33     3.3V   pin 9            內部 ROM
+PVCC33    3.3V   pin 19           HDMI PLL           ⚠ 同上
+OVDD33    3.3V   pin 13           5V-tolerant IO（DDC / HPD / CEC / I2C）
+OVDD      1.8 / 2.5 / 3.3V  pin 1, 34   ← RGB 輸入腳的電源，可選
+```
+
+**v0.2 之前的規格寫「4 組電源域」，漏掉了這一條。** 實際是 5 組外部電源軌。
+
+```
+Functional Operation Conditions   1.14 / 1.2 / 1.26 V
+VCCNOISE                          Max 100 mVpp     ← 雜訊要求很緊
+全片功耗                           < 70 mW @1080p60  (IT66121 DS p.3)
+```
+
+功耗只有 70 mW，**1.2V 的電流很小（估 < 50 mA）**，用一顆 3.3V→1.2V 的 LDO 即可：
+
+```
+壓降 2.1V × 50 mA ≈ 105 mW     SOT-23 封裝散得掉
+LDO 而非 DC-DC 的理由：VCCNOISE 只給 100 mVpp，DC-DC 的切換漣波不值得冒險
+AVCC12 / PVCC12 另外用磁珠 + 0.1µF + 10µF 從 1.2V 幹線隔開（datasheet 要求 regulated）
+```
+
+詳見 [001-power.md](001-power.md) §1 與 §2.5。
+
+#### OVDD 選 3.3V
+
+OVDD 決定 RGB 輸入腳的電平，1.8 / 2.5 / 3.3V 皆可 `(IT66121 DS p.14)`，
+**所以 IT66121 對 VCC-PD 的電壓沒有任何限制** —— 007-pinmap.md §8 的待決事項
+「VCC-PD 要同時滿足 MIPI 與 IT66121」，IT66121 這一半不存在。
+
+選 3.3V 的理由：`VIH = 2.0V min`，配 T113 的 3.3V 輸出有 1.3V 餘裕；
+選 1.8V 則 `VIH = 1.2V`，餘裕只剩 0.6V，而 22 條線的 SSO 地彈就吃這個餘裕。
+
+---
 
 ### 3.3 TMDS 差分
 
@@ -282,8 +483,8 @@ CEC         可選，V1 不做
 | | MIPI DSI | RGB → HDMI |
 |---|---|---|
 | 差分對 | 5 | 4（TMDS） |
-| 單端線 | 0 | **28** |
-| 額外零件 | FPC 座 | IT66121 + 28 顆阻尼電阻 + ESD |
+| 單端線 | 0 | **22** |
+| 額外零件 | FPC 座 | IT66121 + 22 顆阻尼電阻 + 10 顆 0Ω + ESD + **1.2V LDO** |
 | 板面積 | 小 | **大** |
 | 驗證難度 | 高（要有面板、要調參數） | **低（插螢幕就能看）** |
 
@@ -302,5 +503,11 @@ MIPI 還要對面板 timing、init sequence、lane 設定，變因多得多。
 [ ] RGB 22 條對 CK 等長，串聯阻尼電阻已放且靠近驅動端
 [ ] HDMI ESD 保護已放，電容 <1pF
 [ ] DDC 上拉到 5V
-[ ] IT66121 的 RGB 輸入時脈上限 ≥ 目標解析度所需
+[x] IT66121 的 RGB 輸入時脈上限 ≥ 目標解析度所需
+      → Fpixel 25~165 MHz，1080p60 的 148.5 MHz 在範圍內  (IT66121 DS p.17)
+[ ] IT66121 的 1.2V 軌已放（IVDD12 / AVCC12 / PVCC12 / DVDD12），且 AVCC12 / PVCC12 有隔離
+[ ] IT66121 的 OVDD 接 3.3V，OVDD33 / VCC33 / PVCC33 接 3.3V
+[ ] IT66121 的 D[17:16] / D[9:8] / D[1:0] 接 GND（RGB666 未用的 6 個 LSB）
+[ ] 原理圖上 RGB 接線一律標 LCD0-D 編號，不用顏色名稱（避免 R/B 對調）
+[ ] ENTEST (pin 31) 經電阻接地、REXT (pin 20) 經 5.6kΩ 1% 接 AGND
 ```

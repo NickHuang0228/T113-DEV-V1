@@ -1,6 +1,6 @@
 # 007 · 腳位分配與 bank 策略
 
-版本：v0.2 · 2026-09-19（WiFi footprint 移除，PG bank 全部給排針）
+版本：v0.3 · 2026-09-20（VCC-PD / VCC-PE 電壓定案；補上 PB2~PB7 的 RGB888 選項紀錄）
 
 **資料來源**：`T113-S3_Datasheet_v1.6` Table 4-2（Pin Characteristics）與 Table 4-3（Pin Multiplexing）。
 
@@ -90,9 +90,14 @@ CMOS IO 裡有寄生 SCR。過壓觸發後在 VCC/GND 間形成自我維持的�
 | PB | VCC-IO | 3.3V 固定 | UART0 log、I2S 音訊 | **失去 console** |
 | PC | VCC-IO | 3.3V 固定 | SPI0 → SPI NOR | **失去備援開機** |
 | PF | VCC-IO | 3.3V 固定 | SDC0 → microSD | **失去主要開機** |
-| PD | VCC-PD | 1.8 / 3.3V 可選 | MIPI DSI + RGB666 | 顯示全失 |
-| PE | VCC-PE | 1.8 / 2.8 / 3.3V | RMII → RTL8201F | **失去 TFTP/NFS 開發循環** |
-| PG | VCC-PG | 1.8 / 3.3V 可選 | **全部給排針**（WiFi 已移除） | **幾乎無損失** |
+| PD | VCC-PD | **3.3V 定案** | MIPI DSI + RGB666 | 顯示全失 |
+| PE | VCC-PE | **3.3V 定案** | RMII → RTL8201F | **失去 TFTP/NFS 開發循環** |
+| PG | VCC-PG | **3.3V 定案** | **全部給排針**（WiFi 已移除） | **幾乎無損失** |
+
+> **v0.3：三個可選 bank 全部定 3.3V。** 依據見 [001-power.md](001-power.md) §1.1。
+> 簡述：RTL8201F 的數位 IO 只吃 3.3V 且無獨立 VDDIO；IT66121 的 OVDD 三種電壓皆可、
+> 不構成限制；MIPI D-PHY 吃的是 VCC-LVDS (1.8V) 而非 VCC-PD，所以 MIPI 也不綁。
+> **結果是全板 IO 單一電平，排針、周邊、除錯全部不必轉換。**
 
 > ⚠ **PB / PC / PF 三個 bank 綁在同一條 VCC-IO 上。**
 > 那條軌上掛著：主要開機裝置 + 備援開機裝置 + 唯一的 log 輸出。
@@ -168,17 +173,22 @@ VCC-PD 因 MIPI 而選 1.8V  →  PD bank 上所有腳都是 1.8V
 ### 6.1 PD bank — 顯示（VCC-PD）
 
 ```
-PD0 ~ PD9     MIPI DSI 4-lane + CLK   ★ 優先
-              ／ RGB666 低 10 位（經 0Ω）
-PD10 ~ PD17   RGB666 其餘 8 位
+PD0 ~ PD5     LCD0-D2~D7    = B[5:0]   ┐ 與 MIPI DSI 重疊，經 0Ω
+PD6 ~ PD9     LCD0-D10~D13  = G[3:0]   ┘
+PD10 ~ PD11   LCD0-D14~D15  = G[5:4]   ┐
+PD12 ~ PD17   LCD0-D18~D23  = R[5:0]   ┘ 只有 RGB 用，直接接
 PD18 ~ PD21   LCD0-CLK / DE / HSYNC / VSYNC
 PD22          OWA-OUT / IR-RX / UART1-RX / GPIO
 ```
 
+⚠ **v0.2 的 002-display.md 把 R 與 B 標反了**（寫成 PD0~PD5 = R）。
+正確對應見 [002-display.md](002-display.md) §3.2，出處是 UM Table 5-2 (p.399) 的 high-aligned 規則。
+**原理圖上一律標 `LCD0-D` 編號，不標顏色** —— 兩顆晶片的 D 索引一致，按編號接就不會錯。
+
 **MIPI 模式下 PD10~PD21 閒置**，其中 PD10~PD13 借給排針當 SPI1（見 §7.3）。
 PD14~PD21 保持閒置，不對外 —— PG 的 GPIO 已經夠用，不必增加 VCC-PD 的暴露面。
 
-⚠ VCC-PD 電壓待定：要同時滿足 MIPI 與 IT66121 的 OVDD（1.8 / 2.5 / 3.3V 皆可）。
+✅ **VCC-PD = 3.3V 定案**（見 §3 的表與 001-power.md §1.1）。
 
 ### 6.2 PE bank — 乙太網路（VCC-PE）
 
@@ -202,6 +212,21 @@ PC2 ~ PC7    SPI0 → SPI NOR 16MB（備援開機）
 PB0 ~ PB1    UART0 → CH340N（console）      ⚠ 腳位待確認
 PB2 ~ PB7    I2S2 音訊 codec / TWI 備用
 ```
+
+#### ⚠ PB2~PB7 同時是 RGB888 缺的那 6 個 bit —— 這是一個被放棄的選項
+
+`(DS Table 4-3, p.30 Function2)`
+
+```
+PB2 = LCD0-D0 (B0)    PB4 = LCD0-D8  (G0)    PB6 = LCD0-D16 (R0)
+PB3 = LCD0-D1 (B1)    PB5 = LCD0-D9  (G1)    PB7 = LCD0-D17 (R1)
+```
+
+**所以 T113-S3 其實做得到 RGB888**（PD0~PD21 + PB2~PB7 = 28 支）。
+本專案不做，理由是 bank 風險：PB 在 VCC-IO 上，那條軌同時掛著 microSD、SPI NOR、
+UART0 console —— **為了 1.2% 的色深把 6 條 148MHz 的線拉進命脈 bank，不划算。**
+
+記在這裡是為了避免日後又把「RGB666」誤記成晶片限制。
 
 ### 6.4 PG bank — 全部給排針（VCC-PG）
 
@@ -297,8 +322,8 @@ PG 總共 16 支（WiFi footprint 已移除，全部可用）
 ## 8. 待決事項
 
 ```
-[ ] VCC-PD 電壓：1.8V 或 3.3V（要同時滿足 MIPI 與 IT66121 OVDD）
-[ ] VCC-PE 電壓：1.8 / 2.8 / 3.3V（要滿足 RTL8201F 的 IO 電平）
+[x] VCC-PD 電壓 → **3.3V**（IT66121 OVDD 無限制、D-PHY 吃 VCC-LVDS）
+[x] VCC-PE 電壓 → **3.3V**（RTL8201F 數位 IO 只吃 DVDD33，無獨立 VDDIO）
 [x] VCC-PG 電壓 → **3.3V**（WiFi 移除後不再被 SDIO 綁住，配合外接模組）
 [x] WiFi footprint → **移除**，PG0~PG5 釋放給排針（2026-09-19 決定）
 [ ] UART0 (console) 的實際腳位（PB bank，待 p.77 核對）

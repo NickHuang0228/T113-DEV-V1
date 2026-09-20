@@ -16,18 +16,50 @@
 
 ```
 Allwinner T113-S3
-  CPU      2× ARM Cortex-A7 @1.2GHz
-  協處理器  RISC-V C906 @1.0GHz + HiFi4 DSP
-  GPU      Mali-G31 MP2
-  記憶體    128MB DDR3（SIP 封裝，晶片內建）
+  CPU      2× ARM Cortex-A7           (DS §2.1 p.3)
+            ⚠ datasheet 未載明時脈,全文搜 `GHz` 零命中
+  協處理器  HiFi4 DSP（單核）           (DS §2.2 p.3)
+            ⚠ 沒有 RISC-V C906 —— 見下方勘誤
+  GPU      ⚠ 沒有 GPU —— 見下方勘誤
+            只有 DE（顯示引擎）/ DI（去交錯）/ G2D（2D 加速）  (DS §2.5 p.5-6)
+  記憶體    128MB DDR3（SIP 封裝，晶片內建），時脈上限 800MHz  (DS §2.3.2 p.4)
   封裝      eLQFP128  14 × 14 × 1.4 mm  (DS §2.12 p.19 / §7.1 p.77)
             底部 EPAD = pin 129 = 這顆晶片唯一的數位地（見 001-power.md §7）
   電壓      VDD-CORE / VDD-SYS  0.9V     ⚠ 不是 1.1V
             VCC-DRAM0/1         1.5V     ⚠ 內建 DDR3 仍要外部供電
-            VCC-IO / GPIO bank  3.3V
-            1.8V 群              由晶片內建 LDOA 供（@260mA 上限）
+            VCC-IO              3.3V
+            VCC-PD/PE/PG        3.3V     全部定案（001-power.md §1.1）
+            1.8V 群              外部 LDO（內建 LDOA 僅 260mA，不夠賭）
   價格      約 $8（LCSC，需查即時價與庫存）
 ```
+
+### ⚠ v0.3 勘誤：兩項規格是錯的，而且會影響驗收標準
+
+`Mali-G31 MP2` 與 `RISC-V C906` **在 datasheet 與 User Manual 裡完全不存在**。
+全文搜 `Mali` / `GPU` / `OpenGL` / `Vulkan` / `RISC-V` / `C906` —— 兩份文件都零命中。
+
+```
+DS §1 Overview, p.3
+  "T113-S3 ... integrates dual-core Cortex-A7 CPU and single-core HiFi4 DSP"
+DS §2.1 CPU Architecture, p.3
+  "Dual-core ARM Cortex-A7" —— 就這一行，沒有第二種核心
+DS 系統方塊圖, p.20
+  Video Output 區塊只有 DE / DI / G2D，沒有 3D 引擎
+```
+
+這兩項應該是從**同門的其他晶片**抄來的（D1/D1s 有 C906，A133/T507 有 Mali-G31）。
+
+**後果（這才是重點）：**
+
+```
+沒有 GPU    → 顯示堆疊只有 framebuffer / DRM-KMS + G2D 2D 搬圖
+              沒有 OpenGL ES，跑不了桌面合成、glmark2、任何 3D
+              「HDMI 出畫面」的驗收 = 測試圖樣 / 影片解碼，不是桌面環境
+沒有 C906   → 沒有 RISC-V 副核可玩
+```
+
+⚠ 另外：**datasheet 全文沒有出現任何 CPU 時脈數字**（搜 `GHz` 零命中）。
+`@1.2GHz` 是市場資料，不是規格書數字 —— 本文件不再引用。
 
 **選它的核心理由：內建 DDR3。** 第一塊 Linux 板最大的失敗來源是 DDR layout（32-bit 匯流排等長 ±0.6mm、fly-by 拓樸、阻抗控制），T113-S3 把這塊做進封裝裡，等於整條風險刪除。
 
@@ -53,9 +85,29 @@ RGB 並列   PD0 ~ PD21   （18 資料 + 4 控制 = 22 條）
 軟體切換不能把電氣負載切掉 → **PD0~PD9 用 10 顆 0Ω 隔離，MIPI 直通、IT66121 走分支。**
 本專案優先序：**MIPI DSI > RGB/HDMI**。詳見 [002-display.md](design/002-display.md) §1。
 
-⚠ **T113-S3 的 RGB 最多 RGB666（18-bit），沒有 RGB888** ——
-PD bank 上不存在 LCD0-D0/D1/D8/D9/D16/D17。HDMI 輸出因此是 26 萬色，漸層會有 banding。
-MIPI DSI 則支援 RGB888。
+⚠ **本板的 RGB 並列選 RGB666（18-bit），HDMI 輸出因此是 26 萬色，漸層會有 banding。**
+
+這是取捨，不是晶片限制：缺的 6 個 bit（LCD0-D0/D1/D8/D9/D16/D17）在 PD bank 上
+確實不存在，但它們在 **PB2~PB7 的 Function2** 上 `(DS Table 4-3 p.30)`，
+UM Table 5-2 (p.399) 也有完整的 RGB888 欄。**晶片支援 RGB888，我們選擇不借 PB。**
+
+不借的理由：PB 在 VCC-IO 上，那條軌同時掛著 microSD、SPI NOR、UART0 console
+—— 為了 1.2% 的色深把 6 條 148MHz 的線拉進命脈 bank，不划算。見 007-pinmap.md §6.3。
+
+腳位對應（UM Table 5-2 的 high-aligned 規則 + DS Table 4-3）：
+
+```
+PD0 ~ PD5    = LCD0-D2 ~ D7    = B[5:0]      ⚠ PD0 是 B0(LSB)
+PD6 ~ PD11   = LCD0-D10 ~ D15  = G[5:0]
+PD12 ~ PD17  = LCD0-D18 ~ D23  = R[5:0]
+PD18~PD21    = CLK / DE / HSYNC / VSYNC
+```
+
+**原理圖一律標 `LCD0-D` 編號，不標顏色** —— IT66121 的輸入腳也叫 `D[23:0]` 且同樣
+high-aligned，按編號 1:1 接就自動對；轉成顏色名稱才會有 R/B 對調的機會。
+未用的 IT66121 D[17:16] / D[9:8] / D[1:0] 接 GND。
+
+MIPI DSI 則支援 RGB888 `(DS §2.6.2 p.6)`。
 
 選 IT66121 而非 LT8618SX 的理由：
 
@@ -167,14 +219,23 @@ Type-C VBUS 5V
   ├─ DC-DC   →  3.3V   VCC-IO / GPIO bank / PHY / IT66121 / LDO-IN   ~470mA
   ├─ DC-DC   →  1.5V   VCC-DRAM0/1（DDR3 本體）                       TBD
   ├─ DC-DC   →  0.9V   VDD-CORE0/1 + VDD-SYS0/1/2                    TBD
-  ├─(晶片內)  →  1.8V   VCC-PLL / VCC-RTC / VCC-LVDS / AVCC
-  │                     由內建 LDOA 供，上限 260mA  ⚠ 須先算負載
+  ├─ LDO     →  1.8V   VCC-PLL / VCC-RTC / VCC-LVDS / AVCC / VDD18-DRAM
+  │                     外部 LDO，晶片內建 LDOA 僅 260mA 不夠賭
+  ├─ LDO     →  1.2V   IT66121 IVDD12 / AVCC12 / PVCC12 / DVDD12     ~50mA
+  │                     ⚠ VCCNOISE 只容許 100mVpp → 用 LDO 不用 DC-DC
   └─ 直通     →  5V    USB-A Host（含限流）                           500mA
 
-外部電壓：3.3V / 1.5V / 0.9V（MangoPi 用單顆 RY1303 三路 DC-DC）+ **一組外部 1.8V**
+外部電壓：**3.3V / 1.5V / 0.9V / 1.8V / 1.2V 共 5 組**
+（3.3/1.5/0.9 可用單顆三路 DC-DC 如 RY1303，1.8V 與 1.2V 各一顆 LDO）
 
 ⚠ 1.8V 不要全押內建 LDOA（只有 260mA，且 VDD18-DRAM / AVCC / VCC-TVIN 在 datasheet 是 TBD）。
 MangoPi 自己也放了外部 XC6206-1.8V LDO。多一顆 $0.05 換掉一個未知數。
+
+⚠ **1.2V 是 v0.3 才發現的** —— IT66121 自帶核心電壓需求，不像 RTL8201F 有內建 LDO。
+周邊 IC 的電源腳必須逐顆開 Power/Ground Pins 那一頁，不能假設「3.3V 單軌」。
+
+IO bank 電壓：**VCC-PD / VCC-PE / VCC-PG 全部 3.3V**（見 001-power.md §1.1），
+全板 IO 單一電平，不需要任何電平轉換。
 ```
 
 詳見 [001-power.md](design/001-power.md)。峰值估算 **~900mA @5V = 4.5W**，Type-C 5V/3A 餘裕三倍。
@@ -210,7 +271,7 @@ T113-S3 ×2                              $16
 IT66121 ×2                              $8
 RTL8201F ×2                             $2.5
 CH340N ×2                               $1.6
-電源 4 組 ×2                             $8
+電源 5 組 ×2                             $10
 RJ45 含變壓器 ×2                         $4
 接頭（HDMI / Type-C ×2 / USB-A / SD / FPC / 排針）  $11
 SPI NOR / 晶振 ×3 / 被動件 ~80 顆        $12
@@ -314,8 +375,17 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [x] EPAD (pin 129) 是唯一數位地 → 必焊，交給 PCBA `(DS §4.1 p.23)`
 - [x] IT66121 封裝 → **QFN64 9×9 mm + 底部 GND pad**（非 LQFP64）
 - [x] MIPI 與 RGB 共用 PD0~PD9 實體接腳 → 需 0Ω 隔離 `(DS Table 4-3)`
-- [x] RGB 最多 RGB666，非 RGB888 → 22 條而非 28 條 `(DS Table 4-3 / §2.6.1 p.6)`
+- [x] **本板選 RGB666 → 22 條**（晶片支援 RGB888，需另借 PB2~PB7，本板不借）
+      `(UM Table 5-2 p.399 / DS Table 4-3 p.30)`，理由見 007-pinmap.md §6.3
 - [x] 解析度上限 → RGB 1920×1080@60、MIPI DSI 1920×1200@60 `(DS §2.6 p.6)`
+- [x] **TCON 數量 → 2 組**：TCON_LCD（RGB/LVDS/DSI 共用）+ TCON_TV（CVBS）
+      `(UM §5.1 p.397 / §5.2 p.452；CCU 0x0B60 / 0x0B80)` → RGB 與 DSI 確定二選一
+- [x] **RGB pixel clock 上限 → 200 MHz**（tDCLK min 5 ns）`(DS §5.11.1 Table 5-18, p.61)`
+      IT66121 只到 165 MHz → **瓶頸在橋接晶片**，1080p60 的 148.5 MHz 兩邊都過
+- [x] **RGB666 腳位對應**：PD0~PD5 = B[5:0]、PD6~PD11 = G[5:0]、PD12~PD17 = R[5:0]
+      ⚠ 002-display.md v0.2 把 R/B 標反，v0.3 已更正
+- [x] **IT66121 需要 1.2V 軌**（IVDD12/AVCC12/PVCC12/DVDD12）`(IT66121 DS p.7, p.14)`
+- [x] **RTL8201F 只需 3.3V**（核心 1.1V 由內建 LDO 產生，且不可外供）`(RTL DS §8.8 p.38)`
 
 **未確認**
 
@@ -324,14 +394,16 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
       本體 D1/E1 **14.00** · **含腳 D/E 16.00** · 共面度 ccc 0.08 · JEDEC **MS-026**
       **EPAD = 5.72 × 5.72 mm**（機構圖有六組選項，CAUTION 指定第 ② 組）
       ⚠ 陷阱：第 ⑥ 組也是 5.72 開頭但為長方形 5.72/5.46
-- [ ] MIPI DSI 最高 lane rate（解析度上限已確認 1920×1200@60，`DS §2.6.2 p.6`）
-- [ ] MIPI D-PHY 的電源軌與 4-lane 電流（決定 1.8V 要不要外部供）
+- [ ] MIPI DSI 最高 lane rate —— **DS 與 UM 都沒有公布**
+      UM §5.4 只有 1 頁概述，無暫存器、無 D-PHY 時序表
+      解析度上限 1920×1200@60 `(DS §2.6.2 p.6)` 反推約 1.0~1.2 Gbps/lane
+      → layout 一律照 1.5 Gbps 的規格做（100Ω ±10%、對內 ±0.1mm），不賭
+- [ ] MIPI D-PHY 的 4-lane 電流（電源軌已推定為 VCC-LVDS，見 001-power.md §2.2.2）
 - [ ] VDD18-DRAM (pin 50) 接內建 LDOA 還是外部 1.8V
-- [ ] RGB 並列輸出的 pixel clock 上限（`DS §5.11.1 LCD AC Electrical Characteristics, p.60`）
 - [ ] IT66121 的 SYSRSTN 要接 GPIO（MIPI 模式時保持 reset）
-- [ ] IT66121 的 RGB 輸入時脈上限與電源需求
+- [ ] 1.2V LDO 選型（3.3V→1.2V，≥100mA，SOT-23）+ LCSC 料況
 - [x] IT66121 封裝機構圖 → QFN-64 9×9，pitch 0.5，EPAD 3.78×3.78 `(IT66121 DS Figure 17, p.40)`
 - [x] RTL8201F 封裝機構圖 → QFN-32 5×5，pitch 0.5，EPAD 3.35×3.35 `(RTL DS §10.1, p.55, JEDEC MO-220)`
-- [ ] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 或 3.3V
+- [x] VCC-PD / VCC-PE / VCC-PG → **全部 3.3V**（見 001-power.md §1.1）
 - [ ] RY1303（三路 DC-DC）的 LCSC 料況 → 決定用三路或分離式 ×3
 - [ ] 所有零件的 LCSC 料號、即時價、庫存、是否 Basic Part

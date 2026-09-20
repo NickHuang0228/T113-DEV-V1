@@ -114,13 +114,27 @@ MIPI DSI  PD0~PD9   RGB 並列  PD0~PD21   → 前 10 支完全重疊
 緩解：0Ω 貼著分支點放，MIPI 直通不串任何東西。詳見 002-display.md §1
 ```
 
-**⑤ RGB 並列等長 —— HDMI 無畫面或花屏**
+**⑤ RGB 並列的 SSO noise —— HDMI 無畫面或花屏**（v0.3：等長已不是風險，改列 SSO）
 
 ```
-18 條資料（RGB666，非 RGB888）+ 4 控制，對 CK 等長
-pixel clock 若跑 1080p 約 148MHz，skew budget 約 ±80mm（比 DDR 寬鬆得多）
-真正的殺手是 SSO noise：24 條同時翻轉的地彈
-緩解：串聯阻尼電阻 22~33Ω、控制 slew rate、完整 GND 回流
+18 條資料（本板選 RGB666）+ 4 控制，1080p60 → 148.5 MHz
+
+等長：不是風險。用 IT66121 的真實 TS=1.5ns / TH=0.7ns 重算，
+      扣掉保守的 3.5ns 給 SoC skew + jitter，PCB 仍有 ~149mm 餘裕，
+      而 100×100mm 板上兩條線根本差不到那麼多。做到 ±10mm 是整齊，不是需求。
+
+真正的風險：22 條同時翻轉的 SSO 地彈，會直接吃掉 IT66121 那 2.0ns 的 jitter 預算。
+緩解：串聯阻尼電阻 22~33Ω、控制 slew rate、完整 GND 回流、資料線分組穿插 GND
+```
+
+**⑦ 周邊 IC 的隱藏電源軌 —— 漏了就是少焊一顆 LDO，板子回來才發現**（v0.3 新增）
+
+```
+IT66121 自帶 1.2V 核心需求（IVDD12/AVCC12/PVCC12/DVDD12），且 VCCNOISE 只容許 100mVpp
+RTL8201F 則有內建 LDO，只吃 3.3V —— 同樣是周邊 IC，一顆要、一顆不要
+
+教訓：每顆 IC 都要開 Power/Ground Pins 那一頁逐腳看，不能假設「3.3V 單軌」
+      這一條在 v0.2 之前是漏的，規格書上「4 組電源域」寫了兩個版本都沒人發現
 ```
 
 **⑥ Linux 跑不起來 —— 但這是軟體問題，可以慢慢調**
@@ -155,8 +169,15 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
         [x] 上電時序 → T1>2ms、T2>64ms，關機無限制
         [x] 電源軌電壓 → 0.9V / 1.5V / 3.3V + 內建 LDOA 供 1.8V
         [x] 熱阻 → θJA 20.36°C/W，不需散熱片
-        [ ] 封裝機構圖數字（pitch / b / L / D,E / **D3,E3**）—— p.78 有原廠 CAUTION
-        [ ] TCON 數量、MIPI lane rate、RGB pixel clock 上限
+        [x] 封裝機構圖數字（pitch / b / L / D,E / **D3,E3**）—— 見 008-footprint.md
+        [x] TCON 數量 → **2 組**（TCON_LCD 給 RGB/LVDS/DSI，TCON_TV 給 CVBS）
+        [x] RGB pixel clock 上限 → **SoC 200MHz**（tDCLK≥5ns, DS Table 5-18 p.61）
+            **IT66121 165MHz 才是瓶頸**；1080p60 的 148.5MHz 兩邊都過
+        [~] MIPI lane rate → **DS 與 UM 都沒公布**（UM §5.4 只有 1 頁概述）
+            由 1920×1200@60 反推約 1.0~1.2 Gbps/lane → layout 照 1.5Gbps 規格做
+        [x] 勘誤：T113-S3 **無 GPU、無 RISC-V C906**，datasheet 全文零命中
+        [x] IT66121 需要 **1.2V** 核心軌 → 全板電源域由 4 組改為 **5 組**
+        [x] VCC-PD / VCC-PE / VCC-PG → **全部 3.3V**
         [ ] 零件料號逐項查證（LCSC 即時價、庫存、Basic/Extended）
 
 階段 1  原理圖
@@ -207,6 +228,10 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
 - [x] IT66121 / RTL8201F 機構圖已取得，KiCad 標準件對得上（見 008-footprint.md §4 §5）
 - [ ] ⚠ RTL8201F 確認用 datasheet §10.1 的 QFN-32，不是 §10.2 LQFP-48 / §10.3 QFN-48
 - [ ] 電源上電時序對照 datasheet，寫成文件記錄
+- [ ] **IT66121 的 1.2V LDO 已放**，AVCC12 / PVCC12 / PVCC33 各自磁珠隔離
+- [ ] **IT66121 的 REXT 用 5.6kΩ 1%**（決定 TMDS 擺幅），ENTEST 經電阻接地
+- [ ] **RGB 接線在原理圖上標 LCD0-D 編號，不標顏色**（避免 R/B 對調）
+- [ ] IT66121 的 D[17:16] / D[9:8] / D[1:0] 接 GND（RGB666 未用的 6 個 LSB）
 - [ ] 分壓電阻算出的電壓與標稱值相符（用公式驗算，不靠標籤）
 - [ ] DRC violations / unconnected / schematic parity 三項歸零
 - [ ] 四層鋪銅完成，內層 GND 為完整一片
