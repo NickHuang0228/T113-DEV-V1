@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "T113-DEV-V1")(type "KiCad")(uri "${KIPRJMOD}/footprints/T113-DEV-V1.pretty")(options "")(descr "本專案自建 footprint"))
+)
