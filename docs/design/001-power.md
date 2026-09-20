@@ -1,6 +1,6 @@
 # 001 · 電源樹與上電時序
 
-版本：v0.3 · 2026-09-20（查完 IT66121 / RTL8201F 電氣規格：多一條 1.2V 軌，VCC-PE / VCC-PD 電壓定案）
+版本：v0.4 · 2026-09-20（**IT66121 停產改用 ADV7511**：1.2V 軌取消，1.8V 軌改為外部 600mA LDO）
 
 **資料來源**：`T113-S3_Datasheet_v1.6_20220303.pdf`，以下標註格式為 `(DS §5.3 p.45)`。
 交叉驗證對象：`MangoPi_MQ-R_sch_v1.6.pdf`（分壓值已驗算，見 §2.4）。
@@ -26,7 +26,7 @@
 | | VCC-TVOUT | CVBS 輸出 |
 | | LDO-IN | 內部 LDOA/B 的輸入（Max 3.6） |
 | **1.8 或 3.3 V** | VCC-PD / VCC-PE / VCC-PG | GPIO bank，**可選**（VCC-PE 另支援 2.8V） |
-| **1.2 V** | **IT66121** IVDD12 / AVCC12 / PVCC12 / DVDD12 | **HDMI 橋接晶片核心與類比**（v0.3 新增，見 §1.2） |
+| **1.8 V** | **ADV7511** DVDD / AVDD / PVDD / BGVDD | **HDMI 橋接晶片**，約 180 mA（見 §1.2） |
 | **5 V** | — | USB-A Host 直通（含限流） |
 
 > ⚠ v0.1 寫的 `VDD_CPU / VDD_SYS = 1.1V` 是錯的，datasheet Typ 是 **0.9 V**。
@@ -41,7 +41,7 @@ VCC-PD / VCC-PE / VCC-PG 可選 1.8V 或 3.3V，**這決定該 bank 上所有訊
 
 ```
 VCC-PD   PD0~PD9  = MIPI DSI / RGB 共用  →  ★ MIPI 優先，電平以 MIPI 為準
-         PD10~PD21 = RGB666 其餘         →  必須與 IT66121 的輸入電平相容
+         PD10~PD21 = RGB666 其餘         →  必須與 ADV7511 的輸入電平相容
 VCC-PE   PE bank  = RMII / CSI     →  必須與 RTL8201F 的 IO 電平相容
 VCC-PG   PG bank  = SDIO / 其他
 ```
@@ -58,7 +58,7 @@ IP101GR   2.5 / 3.3 V
 | Bank | 電壓 | 依據 |
 |---|---|---|
 | **VCC-PE** | **3.3 V** | RTL8201F 的數位 IO 只吃 `DVDD33 = 3.3V±10%`，**沒有獨立 VDDIO 腳**，1.8V 會過不了 VIH `(RTL8201F DS §9.1.2 Table 47, p.44)` |
-| **VCC-PD** | **3.3 V** | IT66121 的 OVDD 可選 1.8/2.5/3.3V，對電壓無要求；MIPI D-PHY 的類比電源是 VCC-LVDS 而非 VCC-PD（見 §2.2.2），所以 MIPI 側也不綁。選 3.3V 換 IT66121 `VIH=2.0V` 的餘裕，並與排針借用的 PD10~PD13 電平一致 |
+| **VCC-PD** | **3.3 V** | ADV7511 的視訊輸入腳支援 1.8V~3.3V CMOS，對電壓無要求；MIPI D-PHY 的類比電源是 VCC-LVDS 而非 VCC-PD（見 §2.2.2），所以 MIPI 側也不綁。選 3.3V 取最大雜訊餘裕，並與排針借用的 PD10~PD13 電平一致 |
 | **VCC-PG** | **3.3 V** | 已於 007-pinmap.md v0.2 定案 |
 
 ```
@@ -67,34 +67,74 @@ IP101GR   2.5 / 3.3 V
      → 找一份真的有接 DSI 面板的 T113/D1 參考設計核對 VCC-PD 接法
 ```
 
-### 1.2 ⚠ 漏掉的第五條軌：IT66121 的 1.2V
+### 1.2 ⚠ 橋接晶片換成 ADV7511 之後：1.2V 取消，1.8V 變成瓶頸
 
-`(IT66121FN DS p.7 Power/Ground Pins；p.14 Functional Operation Conditions)`
+v0.3 查出 IT66121 需要 1.2V，把電源域從 4 組改成 5 組。
+**v0.4 因為 IT66121 停產改用 ADV7511，那條 1.2V 軌又消失了** —— 但換來新的問題。
 
-```
-IVDD12  pin 8, 35, 56    核心邏輯          1.14 / 1.2 / 1.26 V
-PVCC12  pin 18           HDMI PLL          ⚠ "should be regulated"
-AVCC12  pin 23           HDMI 類比前端      ⚠ "should be regulated"
-DVDD12  pin 28           HDMI 數位前端
-
-VCCNOISE   Max 100 mVpp                    ← 雜訊要求比一般數位軌緊
-全片功耗    < 70 mW @1080p60  (DS p.3)     → 1.2V 電流估 < 50 mA
-```
-
-**規格書原本寫「4 組電源域」是錯的，實際 5 組。**
-
-`RGB → IT66121 → HDMI` 這條路只在 datasheet 的功能描述層看，看不出它自帶一條核心電壓軌。
-**查周邊 IC 的電源腳，必須逐顆開 Power/Ground Pins 那一頁，不能假設「3.3V 單軌」。**
-
-實作：
+`(ADV7511W Hardware User's Guide Rev.A, p.11 / p.41)`
 
 ```
-3.3V ──[LDO]──▶ 1.2V ──┬──▶ IVDD12 (×3)、DVDD12
-                        ├──[磁珠]──▶ PVCC12   + 0.1µF + 10µF
-                        └──[磁珠]──▶ AVCC12   + 0.1µF + 10µF
+DVDD      1.8V   數位核心與 IO
+AVDD      1.8V   TMDS 輸出類比
+PVDD      1.8V   PLL           ← 最敏感
+BGVDD     1.8V   band-gap
+DVDD_3V   3.3V
 
-選 LDO 不選 DC-DC：VCCNOISE 只有 100 mVpp，切換漣波不值得冒險
-壓降 2.1V × 50 mA ≈ 105 mW，SOT-23 散得掉
+1.8V 功耗   325 mW  →  約 180 mA
+3.3V 功耗     1 mW
+```
+
+#### 1.8V 的帳重算
+
+```
+原有已知負載（VCC-PLL 2 + VCC-RTC 0.01 + VCC-LVDS 50）   約  52 mA
+ADV7511                                                 約 180 mA
+                                                        ──────────
+                                                        約 232 mA
+晶片內建 LDOA 上限                                          260 mA
+```
+
+**只剩 28 mA 餘裕，而 VDD18-DRAM / AVCC / VCC-TVIN 在 datasheet 裡還是 TBD。**
+
+```
+→ 外部 1.8V LDO 從「保險」變成「必須」
+→ 而且不能用 XC6206（典型僅 200 mA）
+→ 改用 AP2112K-1.8TRG1（C176944，600 mA，$0.17，庫存 47,449）
+```
+
+⚠ 這是一個**反轉**：v0.3 的 §2.2.1 說「多一顆 $0.05 的 XC6206 換掉一個未知數」，
+現在那顆 XC6206 **容量不夠**，要換成貴 8 倍但足量的 AP2112K。
+**負載變了，元件選擇就要跟著重算 —— 不能因為上一版已經選好就沿用。**
+
+#### ADI 的額外要求：1.8V 要分成 3 組電源域
+
+`(同上 p.41 Figure 21)`
+
+```
+"It is recommended to combine the four 1.8 volt power domains of the ADV7511W
+ into 3 separate PCB power domains ... An LC filter on the output ..."
+
+每支電源腳另接 0.1µF，盡量貼近腳位
+PVDD（PLL）最敏感
+```
+
+這是額外的 layout 工作量，要在 placement 階段就留位置給那幾組 LC。
+
+#### 視訊輸入腳的電平：3.3V 直接可用
+
+```
+D[35:0] / CLK / HSYNC / VSYNC / DE
+  "Supports typical CMOS logic levels from 1.8V up to 3.3V."   (p.17)
+```
+
+**§1.1 的 VCC-PD = 3.3V 不必推翻，22 條 RGB 線不需要電平轉換。**
+
+```
+[ ] 待核對：以上出處是 ADV7511W（165MHz 寬溫版）的硬體指南，
+     我們買的是 ADV7511KSTZ。同家族同腳位，但下單前要回 ADV7511 自己的
+     datasheet 核對電源與輸入電平。ADI 官網 PDF 擋 curl/WebFetch，
+     要從 DigiKey/Mouser 鏡像抓或手動下載。
 ```
 
 ### 1.3 RTL8201F 不需要額外電源軌
@@ -107,7 +147,8 @@ VCCNOISE   Max 100 mVpp                    ← 雜訊要求比一般數位軌緊
 → DVDD10 / DVDD10OUT / AVDD10OUT 只掛 0.1µF X5R 低 ESR 電容，不外接電源
 ```
 
-**RTL8201F 全板只吃 3.3V。** 與 IT66121 相反 —— 同樣是周邊 IC，一顆自帶 LDO，一顆沒有。
+**RTL8201F 全板只吃 3.3V。** 與 ADV7511 相反（後者要 1.8V + 3.3V）——
+同樣是周邊 IC，一顆自帶 LDO，一顆沒有。**每顆都要開 Power/Ground Pins 那頁逐腳看。**
 
 ---
 
@@ -165,7 +206,7 @@ VDD18-DRAM                TBD       ← 關鍵未知數，DRAM controller 的電
 ```
 XC6206-1.8V    1.8 V
 XC6206-2.8     2.8 V   （給 OV2640 / OV5640 攝影機的 AVDD2V8）
-XC6206-1.2     1.2 V
+XC6206-1.2     1.2 V   （本專案用不到——ADV7511 不需要 1.2V）
 ```
 
 **所以「板上只有 RY1303 三路，1.8V 只可能來自 LDOA」的排除法不成立** ——
@@ -335,12 +376,17 @@ LDOB-OUT        2.2 µF（即使不使用也要掛，MangoPi C50）
 
 MangoPi 在 AVCC1.8 上用了 **75R 串聯電阻 + LC** 做類比隔離，值得抄。
 
-**IT66121 的 1.2V 另有專門要求** `(IT66121 DS p.15 note 2)`：
+**ADV7511 的 1.8V 另有專門要求** `(ADV7511W HW Guide p.41 Figure 21)`：
 
 ```
-AVCC12 / PVCC12 / PVCC33   各自用磁珠或串聯電阻從幹線隔開 + 0.1µF + 10µF
-REXT (pin 20)              5.6kΩ 1% 接 AGND —— 這顆決定 TMDS 輸出擺幅，不可省
-ENTEST (pin 31)            經電阻接地
+四個 1.8V 域 (DVDD/AVDD/PVDD/BGVDD) 分成 3 組獨立 PCB 電源域，各加 LC 濾波
+每支電源腳 0.1µF，盡量貼近腳位
+PVDD（PLL）最敏感
+```
+
+```
+[ ] 待確認：ADV7511 是否也有類似 IT66121 REXT 的 TMDS 擺幅設定電阻
+             → 回 datasheet 的 Pin Description 確認
 ```
 
 **注意 DC bias**：上一塊板學到的教訓 —— MLCC 在偏壓下容值會掉。
@@ -386,7 +432,7 @@ VDD-CORE / VDD-SYS / VCC-DRAM / VCC-TVIN / AVCC   全部 TBD
 ```
 T113-S3 全速（2×A7 @1.2GHz）  ~1.5 W  → 5V 端約 350 mA（效率 85%）  ⚠ 估算，datasheet TBD
 3.3V GPIO（最壞情況全切換）     432 mA @3.3V = 1.43 W → 5V 端約 340 mA
-IT66121（HDMI 工作中）         <0.07 W → 5V 端約 20 mA   (DS p.3「< 70mW @1080p60」)
+ADV7511（HDMI 工作中）         ~0.33 W → 5V 端約 80 mA   (1.8V 325mW + 3.3V 1mW)
 RTL8201F（100M link up）       ~0.3 W  → 5V 端約  70 mA
 SD / SPI NOR / 被動            ~0.2 W  → 約 50 mA
 USB-A Host 對外                5V × 500 mA = 2.5 W
@@ -531,7 +577,8 @@ B. 背面 via 補焊
 [ ] RY1303 的 LCSC 料況 → 決定三路 DC-DC 或分離式 ×3
 [ ] MangoPi 的 RESET 腳實際有無電容、多大 → 決定要不要加 reset supervisor
 [x] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 還是 3.3V → **三者全選 3.3V**（見 §1.1）
-[ ] 1.2V LDO 選型（3.3V→1.2V，≥100 mA，SOT-23）+ LCSC 料況
+[x] 1.8V LDO 選型 → **AP2112K-1.8TRG1 (C176944, 600mA)**，XC6206 的 200mA 不夠
+[ ] ADV7511 的四個 1.8V 域如何分成 3 組（對照 HW Guide Figure 21）
 [ ] VCC-PD = 3.3V 時 MIPI 是否正常 —— 找有接 DSI 面板的參考設計核對
 [ ] Table 5-2 / 5-3 的數字回 p.45-48 原頁目視核對（pdftotext 欄位有錯位）
 ```
@@ -544,7 +591,7 @@ B. 背面 via 補焊
 [ ] 上電前先量各軌對地電阻，確認沒有短路
 [ ] 3.3V / 1.5V / 0.9V 三軌電壓，誤差 <±3%
 [ ] 若用內部 LDOA，量 LDOA-OUT (pin 28) 是否為 1.8V
-[ ] IT66121 的 1.2V 軌電壓在 1.14~1.26V 內，漣波 <100 mVpp（AC 耦合，這條規格比別條緊）
+[ ] ADV7511 的 1.8V 軌電壓與漣波（PVDD 最敏感，對照 HW Guide Figure 22 的雜訊上限曲線）
 [ ] 四通道示波器抓上電時序：3.3V → 0.9V 間隔 > 2 ms，末軌 → RESET 釋放 > 64 ms
 [ ] 各軌漣波（AC 耦合，20MHz 頻寬限制），目標 <50 mV pp
 [ ] 總電流（待機 / 全速 / 插 USB 裝置）

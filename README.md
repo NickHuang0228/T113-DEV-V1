@@ -14,13 +14,18 @@
 | | ESP32S3-DEV-V1 | **T113-DEV-V1** |
 |---|---|---|
 | 主晶片 | ESP32-S3 模組 | **T113-S3 裸晶片** |
-| 電源域 | 1 組 | **5 組**（3.3 / 1.5 / 0.9 / 1.8 / 1.2V） |
+| 電源域 | 1 組 | **4 組**（3.3 / 1.5 / 0.9 / 1.8V） |
 | 差分對 | 1 對（USB FS 12Mbps） | **9 對**（USB HS / TMDS / MIPI / RMII） |
 | 阻抗控制 | 無 | **必須** |
 | 作業系統 | MicroPython | **Linux（自己 bring up）** |
 | 燒錄 | USB CDC | **SD 卡 / FEL / TFTP+NFS** |
 
 核心目標：**把一顆裸 SoC 從電源、時脈、儲存一路接到能開機、能上網、能推畫面。**
+
+延伸目標（2026-09-20 追加）：**HDMI bridge driver porting 與 IC 驗證**。
+橋接晶片選 ADV7511 就是為了這個 —— mainline `adv7511` 接到 sunxi TCON 是完整的
+bridge 移植練習，驗證面涵蓋 EDID / HPD / HDCP / audio / InfoFrame / CEC。
+見 [002-display.md](docs/design/002-display.md) §6。
 
 ---
 
@@ -32,9 +37,9 @@
          內建 128MB DDR3（SIP 封裝，不需自行 layout DDR）
 
 顯示     MIPI DSI 4-lane  FPC 座
-         RGB666 並列 → IT66121 → HDMI Type-A
+         RGB666 並列 → ADV7511 → HDMI Type-A
          （共用 TCON_LCD 且共用 PD0~PD9 實體腳，10 顆 0Ω 切換）
-         pixel clock 上限：SoC 200MHz / IT66121 165MHz → 1080p60 可行
+         pixel clock 上限：SoC 200MHz / ADV7511 165MHz → 1080p60 可行
 
 網路     RMII → RTL8201F → RJ45 HR911105A（整合式含變壓器）
          WiFi 不做（SDIO 會吃掉 PG bank 6 支腳），要無線插 USB dongle
@@ -79,7 +84,8 @@ PCB      4 層 · 阻抗控制 · 100×100mm 以內
 [x] 選型定案
 [x] 規格書
 [x] datasheet 查證（封裝 / 電源 / 顯示鏈路）
-[!] BOM 料況 —— IT66121 停產，HDMI 橋接待改選（見 009-bom.md）
+[x] BOM 料況查證 —— IT66121 停產，橋接改用 **ADV7511**（見 009-bom.md）
+[!] ADV7511 機構圖與 AC timing 待取得 —— 進 layout 前的阻塞項
 [ ] 原理圖
 [ ] PCB layout
 [ ] 出圖驗證
@@ -103,5 +109,5 @@ PCB      4 層 · 阻抗控制 · 100×100mm 以內
 | [docs/design/006-assembly.md](docs/design/006-assembly.md) | 組裝策略、工具選擇、備品 |
 | [docs/design/007-pinmap.md](docs/design/007-pinmap.md) | bank 策略、腳位分配、排針規格 |
 | [docs/design/008-footprint.md](docs/design/008-footprint.md) | 機構圖實測、EPAD 尺寸、footprint 驗算 |
-| [docs/design/009-bom.md](docs/design/009-bom.md) | **BOM 料況查證、IT66121 停產與替代方案** |
+| [docs/design/009-bom.md](docs/design/009-bom.md) | **BOM 料況查證、橋接晶片改選 ADV7511** |
 | [notes/devlog.md](notes/devlog.md) | 開發日誌 |

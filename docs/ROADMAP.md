@@ -45,7 +45,7 @@
 
 ### 2.3 為什麼 HDMI 走 bridge 反而是好事
 
-T113-S3 沒有原生 HDMI，要靠 IT66121 把 RGB 並列轉成 HDMI。這看似是缺點，實際上：
+T113-S3 沒有原生 HDMI，要靠橋接晶片（v0.4：ADV7511）把 RGB 並列轉成 HDMI。這看似是缺點，實際上：
 
 ```
 多學一個介面   24 條 RGB 並列 + 4 控制線，對 CK 等長
@@ -119,19 +119,21 @@ MIPI DSI  PD0~PD9   RGB 並列  PD0~PD21   → 前 10 支完全重疊
 ```
 18 條資料（本板選 RGB666）+ 4 控制，1080p60 → 148.5 MHz
 
-等長：不是風險。用 IT66121 的真實 TS=1.5ns / TH=0.7ns 重算，
+等長：不是風險。用 IT66121 的 TS=1.5ns / TH=0.7ns 算過一次，
       扣掉保守的 3.5ns 給 SoC skew + jitter，PCB 仍有 ~149mm 餘裕，
       而 100×100mm 板上兩條線根本差不到那麼多。做到 ±10mm 是整齊，不是需求。
 
-真正的風險：22 條同時翻轉的 SSO 地彈，會直接吃掉 IT66121 那 2.0ns 的 jitter 預算。
+⚠ 換成 ADV7511 後這組數字要重取重算（結論預期不變，但算式不能沿用別顆晶片的規格）。
+
+真正的風險：22 條同時翻轉的 SSO 地彈，會直接吃掉橋接晶片的 jitter 預算。
 緩解：串聯阻尼電阻 22~33Ω、控制 slew rate、完整 GND 回流、資料線分組穿插 GND
 ```
 
 **⑦ 周邊 IC 的隱藏電源軌 —— 漏了就是少焊一顆 LDO，板子回來才發現**（v0.3 新增）
 
 ```
-IT66121 自帶 1.2V 核心需求（IVDD12/AVCC12/PVCC12/DVDD12），且 VCCNOISE 只容許 100mVpp
-RTL8201F 則有內建 LDO，只吃 3.3V —— 同樣是周邊 IC，一顆要、一顆不要
+IT66121 要 1.2V、ADV7511 要 1.8V(約180mA)、RTL8201F 只要 3.3V —— 三顆三種答案
+ADV7511 的 180mA 還把 1.8V LDO 從 XC6206(200mA) 逼成 AP2112K(600mA)
 
 教訓：每顆 IC 都要開 Power/Ground Pins 那一頁逐腳看，不能假設「3.3V 單軌」
       這一條在 v0.2 之前是漏的，規格書上「4 組電源域」寫了兩個版本都沒人發現
@@ -172,14 +174,15 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
         [x] 封裝機構圖數字（pitch / b / L / D,E / **D3,E3**）—— 見 008-footprint.md
         [x] TCON 數量 → **2 組**（TCON_LCD 給 RGB/LVDS/DSI，TCON_TV 給 CVBS）
         [x] RGB pixel clock 上限 → **SoC 200MHz**（tDCLK≥5ns, DS Table 5-18 p.61）
-            **IT66121 165MHz 才是瓶頸**；1080p60 的 148.5MHz 兩邊都過
+            **橋接晶片 165MHz 才是瓶頸**；1080p60 的 148.5MHz 兩邊都過
         [~] MIPI lane rate → **DS 與 UM 都沒公布**（UM §5.4 只有 1 頁概述）
             由 1920×1200@60 反推約 1.0~1.2 Gbps/lane → layout 照 1.5Gbps 規格做
         [x] 勘誤：T113-S3 **無 GPU、無 RISC-V C906**，datasheet 全文零命中
-        [x] IT66121 需要 **1.2V** 核心軌 → 全板電源域由 4 組改為 **5 組**
+        [x] 周邊 IC 電源：IT66121 要 1.2V / ADV7511 要 1.8V / RTL8201F 只要 3.3V
         [x] VCC-PD / VCC-PE / VCC-PG → **全部 3.3V**
         [x] 零件料號逐項查證 → 見 009-bom.md
-            ⚠ **IT66121FN 停產（C2684803,庫存 0）** —— HDMI 橋接要改選
+            ⚠ **IT66121FN 停產（C2684803,庫存 0）** → 改用 **ADV7511KSTZ (C179459)**
+            判準從「driver 最省事」改為「driver 工作就是練習目標」,見 002-display.md §3.1
             ⚠ T113-S3 實價 **$22.25**,不是估的 $8 → PCBA 片數 3 降為 2
             ✅ RY1303 料況良好（23,969 顆 @$0.20）,三路 DC-DC 可用
 
@@ -202,9 +205,9 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
         [ ] BOM 料號逐顆核對
         [ ] 零件方向在 Confirm Parts Placement 頁逐顆確認
         [ ] 鋼網**不**加購（部分貼裝用不到，見 006-assembly.md）
-        [ ] PCBA 數量設 3 片，BOM 只列 T113 / IT66121 / RTL8201F
+        [ ] PCBA 數量設 **2 片**（成本驅動），BOM 只列 T113 / ADV7511 / RTL8201F
         [ ] LCSC 零件訂單建立並與 JLCPCB 合併運費
-        [ ] 主晶片備品數量確認（T113 ≥3、IT66121 ≥3）
+        [ ] 主晶片備品數量確認（T113 / ADV7511 各 +1~2，單價分別 $22.25 / $13.75）
 
 階段 4  bring-up
         [ ] 上電量測各電壓軌
@@ -222,19 +225,20 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
 
 比照上一塊板的標準：
 
-- [ ] T113-S3 / IT66121 / RTL8201F footprint 對照 datasheet 機構圖逐項核對，1:1 列印比對
+- [ ] T113-S3 / ADV7511 / RTL8201F footprint 對照 datasheet 機構圖逐項核對，1:1 列印比對
 - [x] **T113-S3 的 EPAD 用 datasheet §7.2 的「第二組」尺寸 → 5.72 × 5.72 mm 正方形**
       ⚠ 機構圖有六組，第 ⑥ 組也是 5.72 開頭但為長方形 5.72/5.46 —— 別選錯
 - [ ] KiCad footprint 用 `LQFP-128_14x14mm_P0.4mm`（JEDEC MS-026 BEE，與 datasheet NOTE 8 相符）+ 自加 EPAD
 - [ ] placement 佔位按 **16.8mm**（含腳與焊盤），不是本體的 14mm
 - [ ] EPAD 下方 thermal via 陣列已放，且設為 **plugged**（否則錫會漏到背面，晶片浮起）
-- [x] IT66121 / RTL8201F 機構圖已取得，KiCad 標準件對得上（見 008-footprint.md §4 §5）
+- [x] RTL8201F 機構圖已取得，KiCad 標準件對得上（見 008-footprint.md §5）
+- [ ] ⚠ **ADV7511 機構圖尚未取得**（ADI 官網擋 curl/WebFetch）—— 進 layout 前的阻塞項
 - [ ] ⚠ RTL8201F 確認用 datasheet §10.1 的 QFN-32，不是 §10.2 LQFP-48 / §10.3 QFN-48
 - [ ] 電源上電時序對照 datasheet，寫成文件記錄
-- [ ] **IT66121 的 1.2V LDO 已放**，AVCC12 / PVCC12 / PVCC33 各自磁珠隔離
-- [ ] **IT66121 的 REXT 用 5.6kΩ 1%**（決定 TMDS 擺幅），ENTEST 經電阻接地
+- [ ] **1.8V LDO 為 600mA 等級**（AP2112K-1.8），ADV7511 四個 1.8V 域分 3 組各加 LC
+- [ ] 確認 ADV7511 是否有類似 REXT 的 TMDS 擺幅設定電阻
 - [ ] **RGB 接線在原理圖上標 LCD0-D 編號，不標顏色**（避免 R/B 對調）
-- [ ] IT66121 的 D[17:16] / D[9:8] / D[1:0] 接 GND（RGB666 未用的 6 個 LSB）
+- [ ] ADV7511 的 D[17:16] / D[9:8] / D[1:0] 接 GND，D[35:24] 依 datasheet 處置
 - [ ] 分壓電阻算出的電壓與標稱值相符（用公式驗算，不靠標籤）
 - [ ] DRC violations / unconnected / schematic parity 三項歸零
 - [ ] 四層鋪銅完成，內層 GND 為完整一片
@@ -262,3 +266,17 @@ Type-C DP 進 ──▶ [板] ──▶ DP 座出
 
 DP 1.4 HBR3 是 **8.1 Gbps/lane** —— 比 MIPI 快 6 倍，是能碰到的最高速差分。
 成本低（沒有貴晶片），技能密度高。
+
+### ⚠ 2026-09-20：這塊板的優先序要調高
+
+職涯目標鎖定 **HDMI/DP driver porting 與 IC 驗證**（MediaTek HDMI 軟韌體工程師職缺
+明列「HDMI **and DP** Linux/Android Kernel driver porting」與「HDMI and DP IC 驗證」）。
+
+```
+T113-DEV-V1  →  HDMI 那一半（ADV7511 bridge porting + 驗證）  ✓
+DP           →  這塊板完全沒有,T113-S3 無 DP 輸出
+```
+
+**第 2 塊只補得到一半。** 第 3 塊從「構想」升級為明確的下一步，
+而且重點應該從純 layout 練習，往「能跑 DP driver / 能做 DP 驗證」偏移 ——
+純被動轉接板量得到訊號但沒有 driver 可寫，要考慮加一顆有 mainline driver 的 DP bridge。

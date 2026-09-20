@@ -14,7 +14,7 @@
 腳位分配不是電氣問題，是**平面配置問題**：
 
 ```
-RGB bank 在晶片哪一側  →  IT66121 就得放哪一側
+RGB bank 在晶片哪一側  →  ADV7511 就得放哪一側
 RMII bank 在哪一側     →  RJ45 就得放哪一側
 ```
 
@@ -95,7 +95,7 @@ CMOS IO 裡有寄生 SCR。過壓觸發後在 VCC/GND 間形成自我維持的�
 | PG | VCC-PG | **3.3V 定案** | **全部給排針**（WiFi 已移除） | **幾乎無損失** |
 
 > **v0.3：三個可選 bank 全部定 3.3V。** 依據見 [001-power.md](001-power.md) §1.1。
-> 簡述：RTL8201F 的數位 IO 只吃 3.3V 且無獨立 VDDIO；IT66121 的 OVDD 三種電壓皆可、
+> 簡述：RTL8201F 的數位 IO 只吃 3.3V 且無獨立 VDDIO；ADV7511 視訊輸入支援 1.8~3.3V、
 > 不構成限制；MIPI D-PHY 吃的是 VCC-LVDS (1.8V) 而非 VCC-PD，所以 MIPI 也不綁。
 > **結果是全板 IO 單一電平，排針、周邊、除錯全部不必轉換。**
 
@@ -141,7 +141,7 @@ I2C                   100Ω   （太大會拖慢上升沿）
 ### 規則 ③ 關鍵控制訊號刻意打散到不同 bank
 
 ```
-不要   面板 RESET、IT66121 SYSRSTN、PHY RESET、USB VBUS EN 全放同一個 bank
+不要   面板 RESET、ADV7511 RESET#、PHY RESET、USB VBUS EN 全放同一個 bank
 要     刻意分散
 ```
 
@@ -322,12 +322,13 @@ PG 總共 16 支（WiFi footprint 已移除，全部可用）
 ## 8. 待決事項
 
 ```
-[x] VCC-PD 電壓 → **3.3V**（IT66121 OVDD 無限制、D-PHY 吃 VCC-LVDS）
+[x] VCC-PD 電壓 → **3.3V**（ADV7511 輸入 1.8~3.3V 通吃、D-PHY 吃 VCC-LVDS）
 [x] VCC-PE 電壓 → **3.3V**（RTL8201F 數位 IO 只吃 DVDD33，無獨立 VDDIO）
 [x] VCC-PG 電壓 → **3.3V**（WiFi 移除後不再被 SDIO 綁住，配合外接模組）
 [x] WiFi footprint → **移除**，PG0~PG5 釋放給排針（2026-09-19 決定）
 [ ] UART0 (console) 的實際腳位（PB bank，待 p.77 核對）
-[ ] 各介面控制訊號的分散配置（面板 RST、IT66121 SYSRSTN、PHY RST、USB VBUS EN）
+[ ] 各介面控制訊號的分散配置（面板 RST、ADV7511 RESET#/INT、PHY RST、USB VBUS EN）
+[ ] ADV7511 的 I2C（控制埠）與 INT 腳分配 —— 控制走 TWI，中斷要一支 GPIO
 [ ] 全部腳位回 p.77 Figure 7-1 目視核對
 [ ] 手繪 placement 草圖，與本表一起迭代
 ```

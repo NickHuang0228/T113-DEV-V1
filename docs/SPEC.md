@@ -72,7 +72,7 @@ DS 系統方塊圖, p.20
 | 輸出 | 規格 | 元件 | 差分對 |
 |---|---|---|---|
 | MIPI DSI | 4 lane + clock，1920×1200@60 | FPC 座 0.5mm | **5 對** |
-| HDMI | RGB666 並列 → HDMI 1.4，1920×1080@60 | IT66121（**QFN64 9×9，底部 GND pad**） | **4 對 TMDS** |
+| HDMI | RGB666 並列 → HDMI 1.4，1920×1080@60 | **ADV7511**（LQFP-100 14×14 + EPAD） | **4 對 TMDS** |
 
 **⚠ 兩者共用同一組實體接腳 PD0~PD9，不只是共用 TCON。** `(DS Table 4-3 Pin Multiplexing)`
 
@@ -82,7 +82,7 @@ RGB 並列   PD0 ~ PD21   （18 資料 + 4 控制 = 22 條）
 重疊       PD0 ~ PD9    完全重疊
 ```
 
-軟體切換不能把電氣負載切掉 → **PD0~PD9 用 10 顆 0Ω 隔離，MIPI 直通、IT66121 走分支。**
+軟體切換不能把電氣負載切掉 → **PD0~PD9 用 10 顆 0Ω 隔離，MIPI 直通、ADV7511 走分支。**
 本專案優先序：**MIPI DSI > RGB/HDMI**。詳見 [002-display.md](design/002-display.md) §1。
 
 ⚠ **本板的 RGB 並列選 RGB666（18-bit），HDMI 輸出因此是 26 萬色，漸層會有 banding。**
@@ -103,19 +103,33 @@ PD12 ~ PD17  = LCD0-D18 ~ D23  = R[5:0]
 PD18~PD21    = CLK / DE / HSYNC / VSYNC
 ```
 
-**原理圖一律標 `LCD0-D` 編號，不標顏色** —— IT66121 的輸入腳也叫 `D[23:0]` 且同樣
+**原理圖一律標 `LCD0-D` 編號，不標顏色** —— ADV7511 的輸入腳也叫 `D[23:0]`（24-bit 模式）且同樣
 high-aligned，按編號 1:1 接就自動對；轉成顏色名稱才會有 R/B 對調的機會。
-未用的 IT66121 D[17:16] / D[9:8] / D[1:0] 接 GND。
+未用的 ADV7511 D[17:16] / D[9:8] / D[1:0] 接 GND，D[35:24] 待確認。
 
 MIPI DSI 則支援 RGB888 `(DS §2.6.2 p.6)`。
 
-選 IT66121 而非 LT8618SX 的理由：
+選 ADV7511 的理由（v0.4，原選 IT66121 已停產）：
 
 ```
-drivers/gpu/drm/bridge/ite-it66121.c   ← mainline 就有 driver
+drivers/gpu/drm/bridge/adv7511/   ← mainline，且含 adv7533/35（MIPI DSI 輸入版）
+drivers/gpu/drm/sun4i/sun4i_rgb.c ← sunxi TCON 原生支援掛 drm_bridge
 ```
 
-LT8618SX 在 Linux 上通常要靠廠商 blob。**第一塊板不在 driver 上冒險。**
+⚠ **選型判準已改變。** v0.3 以前是「第一塊板不在 driver 上冒險」，所以挑最省事的。
+現在的目標是累積 **HDMI/DP kernel driver porting 與 IC 驗證**的實作經驗，
+**driver 工作本身就是要練的東西。**
+
+在此判準下：
+
+```
+ADV7511   完整 HDMI：EDID/HPD/HDCP/audio(N,CTS)/InfoFrame/CEC/CSC    ← 選這個
+TFP410    DVI serializer,連 I2C 都沒有,HDMI 協定層幾乎空白          練不到東西
+MS7210    功能齊但無 mainline,要從零寫且無暫存器文件                 風險過高
+```
+
+⚠ **DP 這塊板給不了** —— T113-S3 無 DP 輸出。要靠 ROADMAP §6 的第 3 塊板，
+**該板優先序應往上提。**
 
 ### 3.2 網路
 
@@ -216,23 +230,27 @@ WiFi footprint 吃掉 PG 16 支裡的 6 支 = 37%
 
 ```
 Type-C VBUS 5V
-  ├─ DC-DC   →  3.3V   VCC-IO / GPIO bank / PHY / IT66121 / LDO-IN   ~470mA
+  ├─ DC-DC   →  3.3V   VCC-IO / GPIO bank / PHY / ADV7511 / LDO-IN   ~470mA
   ├─ DC-DC   →  1.5V   VCC-DRAM0/1（DDR3 本體）                       TBD
   ├─ DC-DC   →  0.9V   VDD-CORE0/1 + VDD-SYS0/1/2                    TBD
   ├─ LDO     →  1.8V   VCC-PLL / VCC-RTC / VCC-LVDS / AVCC / VDD18-DRAM
   │                     外部 LDO，晶片內建 LDOA 僅 260mA 不夠賭
-  ├─ LDO     →  1.2V   IT66121 IVDD12 / AVCC12 / PVCC12 / DVDD12     ~50mA
-  │                     ⚠ VCCNOISE 只容許 100mVpp → 用 LDO 不用 DC-DC
   └─ 直通     →  5V    USB-A Host（含限流）                           500mA
 
-外部電壓：**3.3V / 1.5V / 0.9V / 1.8V / 1.2V 共 5 組**
-（3.3/1.5/0.9 可用單顆三路 DC-DC 如 RY1303，1.8V 與 1.2V 各一顆 LDO）
+外部電壓：**3.3V / 1.5V / 0.9V / 1.8V 共 4 組**
+（3.3/1.5/0.9 用單顆三路 DC-DC RY1303，1.8V 用一顆 600mA LDO）
 
 ⚠ 1.8V 不要全押內建 LDOA（只有 260mA，且 VDD18-DRAM / AVCC / VCC-TVIN 在 datasheet 是 TBD）。
 MangoPi 自己也放了外部 XC6206-1.8V LDO。多一顆 $0.05 換掉一個未知數。
 
-⚠ **1.2V 是 v0.3 才發現的** —— IT66121 自帶核心電壓需求，不像 RTL8201F 有內建 LDO。
-周邊 IC 的電源腳必須逐顆開 Power/Ground Pins 那一頁，不能假設「3.3V 單軌」。
+⚠ **1.8V 軌的容量是 v0.4 的新約束** —— ADV7511 的 1.8V 域吃約 180mA，
+加上原有 52mA 已逼近晶片內建 LDOA 的 260mA 上限。
+**外部 1.8V LDO 必須是 600mA 等級（AP2112K-1.8），XC6206 的 200mA 不夠。**
+
+⚠ 另外 ADI 要求把 ADV7511 的四個 1.8V 域分成 3 組獨立 PCB 電源域各加 LC 濾波。
+
+⚠ 周邊 IC 的電源腳必須逐顆開 Power/Ground Pins 那一頁，不能假設「3.3V 單軌」——
+IT66121 要 1.2V、ADV7511 要 1.8V、RTL8201F 只要 3.3V，三顆三種答案。
 
 IO bank 電壓：**VCC-PD / VCC-PE / VCC-PG 全部 3.3V**（見 001-power.md §1.1），
 全板 IO 單一電平，不需要任何電平轉換。
@@ -268,7 +286,7 @@ PCBA 數量   2 片
 
 ```
 T113-S3 ×2                              $16
-IT66121 ×2                              $8
+ADV7511 ×2                              $27.50
 RTL8201F ×2                             $2.5
 CH340N ×2                               $1.6
 電源 5 組 ×2                             $10
@@ -286,7 +304,7 @@ PCBA 服務費（部分貼裝 3 片，見 7.1）       $21
 
 ```
 T113-S3    估 $8   實際 $22.25   ← 一項就多 $28.50(×2 片)
-IT66121    估 $4   停產,買不到   ← 阻塞項,HDMI 橋接要改選
+IT66121    估 $4   停產,已改用 ADV7511 $13.75 ×2 = $27.50
 ```
 
 連帶決定:**PCBA 片數由 3 片降為 2 片**,否則三個替代方案都會超過 NT$5,000。
@@ -309,7 +327,7 @@ PCB 最低量就是 5 片，**PCBA 貼幾片自己選**，剩下的當裸板寄�
 **改採最右欄「部分貼裝」。** v0.1 原本選中間那欄，查完 datasheet 後改掉，兩個理由：
 
 **① T113-S3 的 EPAD 是唯一的數位地，不焊就不會動，而且焊得好不好看不見。**
-IT66121 是 QFN64 + 底部 GND pad、RTL8201F 是 QFN32 —— 三顆都是手焊高風險件。
+ADV7511 是 LQFP-100 + EPAD、RTL8201F 是 QFN32 —— 三顆都有 EPAD，都是手焊高風險件。
 把「不可觀測的焊點」外包，「可觀測的」留給自己，跟當初選 QFP 不選 BGA 是同一個判斷標準。
 
 **② 部分貼裝反而更便宜。** JLCPCB 的 PCBA 費用幾乎全在 **Extended part 上料費 $3.07/種**，
@@ -380,7 +398,7 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [x] T113-S3 上電時序 → T1 > 2ms、T2 > 64ms，關機無限制 `(DS §5.12 p.73-74)`
 - [x] 熱阻 θJA = 20.36 °C/W、Tj max = 110 °C → 不需散熱片 `(DS §6 p.76)`
 - [x] EPAD (pin 129) 是唯一數位地 → 必焊，交給 PCBA `(DS §4.1 p.23)`
-- [x] IT66121 封裝 → **QFN64 9×9 mm + 底部 GND pad**（非 LQFP64）
+- [x] HDMI 橋接 → **ADV7511KSTZ**，LQFP-100 14×14 + EPAD（IT66121 停產，見 009-bom.md）
 - [x] MIPI 與 RGB 共用 PD0~PD9 實體接腳 → 需 0Ω 隔離 `(DS Table 4-3)`
 - [x] **本板選 RGB666 → 22 條**（晶片支援 RGB888，需另借 PB2~PB7，本板不借）
       `(UM Table 5-2 p.399 / DS Table 4-3 p.30)`，理由見 007-pinmap.md §6.3
@@ -388,10 +406,11 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [x] **TCON 數量 → 2 組**：TCON_LCD（RGB/LVDS/DSI 共用）+ TCON_TV（CVBS）
       `(UM §5.1 p.397 / §5.2 p.452；CCU 0x0B60 / 0x0B80)` → RGB 與 DSI 確定二選一
 - [x] **RGB pixel clock 上限 → 200 MHz**（tDCLK min 5 ns）`(DS §5.11.1 Table 5-18, p.61)`
-      IT66121 只到 165 MHz → **瓶頸在橋接晶片**，1080p60 的 148.5 MHz 兩邊都過
+      ADV7511 只到 165 MHz → **瓶頸在橋接晶片**，1080p60 的 148.5 MHz 兩邊都過
 - [x] **RGB666 腳位對應**：PD0~PD5 = B[5:0]、PD6~PD11 = G[5:0]、PD12~PD17 = R[5:0]
       ⚠ 002-display.md v0.2 把 R/B 標反，v0.3 已更正
-- [x] **IT66121 需要 1.2V 軌**（IVDD12/AVCC12/PVCC12/DVDD12）`(IT66121 DS p.7, p.14)`
+- [x] **ADV7511 需要 1.8V + 3.3V**，1.8V 約 180mA `(ADV7511W HW Guide p.11)`
+- [x] **ADV7511 視訊輸入支援 1.8~3.3V CMOS** → VCC-PD = 3.3V 不受影響 `(同上 p.17)`
 - [x] **RTL8201F 只需 3.3V**（核心 1.1V 由內建 LDO 產生，且不可外供）`(RTL DS §8.8 p.38)`
 
 **未確認**
@@ -407,9 +426,10 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
       → layout 一律照 1.5 Gbps 的規格做（100Ω ±10%、對內 ±0.1mm），不賭
 - [ ] MIPI D-PHY 的 4-lane 電流（電源軌已推定為 VCC-LVDS，見 001-power.md §2.2.2）
 - [ ] VDD18-DRAM (pin 50) 接內建 LDOA 還是外部 1.8V
-- [ ] IT66121 的 SYSRSTN 要接 GPIO（MIPI 模式時保持 reset）
+- [ ] ADV7511 的 RESET# 要接 GPIO（MIPI 模式時保持 reset）
+- [ ] ★ **取得 ADV7511 機構圖與 Video Input AC Timing** —— 目前的阻塞項
 - [ ] 1.2V LDO 選型（3.3V→1.2V，≥100mA，SOT-23）+ LCSC 料況
-- [x] IT66121 封裝機構圖 → QFN-64 9×9，pitch 0.5，EPAD 3.78×3.78 `(IT66121 DS Figure 17, p.40)`
+- [ ] ⚠ **ADV7511 封裝機構圖未取得**（ADI 官網 PDF 擋 curl/WebFetch，要手動下載）
 - [x] RTL8201F 封裝機構圖 → QFN-32 5×5，pitch 0.5，EPAD 3.35×3.35 `(RTL DS §10.1, p.55, JEDEC MO-220)`
 - [x] VCC-PD / VCC-PE / VCC-PG → **全部 3.3V**（見 001-power.md §1.1）
 - [ ] RY1303（三路 DC-DC）的 LCSC 料況 → 決定用三路或分離式 ×3

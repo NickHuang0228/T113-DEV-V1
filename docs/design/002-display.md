@@ -1,6 +1,6 @@
 # 002 · 顯示介面：MIPI DSI 與 RGB→HDMI
 
-版本：v0.3 · 2026-09-20（查完 UM §5 TCON 章節與 IT66121 電氣規格；v0.2 的 R/B 標反、「沒有 RGB888」的說法也不對）
+版本：v0.4 · 2026-09-20（**IT66121 停產,橋接晶片改為 ADV7511**;判準從「driver 最省事」改為「driver 工作本身就是練習目標」）
 
 **專案優先序：MIPI DSI > RGB/HDMI。** 長期目標是 DSI layout 經驗，HDMI 是附帶。
 
@@ -65,11 +65,15 @@ RGB 並列   PD0 ~ PD21   22 支
 ```
 MIPI FPC 座       ┐
                   ├─ 兩者的走線都永遠掛在同一支腳上
-IT66121 RGB 輸入  ┘
+ADV7511 RGB 輸入  ┘
 ```
 
-**軟體切換不能把電氣負載切掉。** 跑 MIPI 模式時，IT66121 的輸入電容（每支約 5 pF）
-加上到 IT66121 的走線，會變成掛在 1 Gbps 差分線上的 stub。
+**軟體切換不能把電氣負載切掉。** 跑 MIPI 模式時，ADV7511 的輸入電容
+加上到 ADV7511 的走線，會變成掛在 1 Gbps 差分線上的 stub。
+
+```
+[ ] 待確認：ADV7511 視訊輸入腳的輸入電容（IT66121 是每支約 5 pF）
+```
 
 而 §2.1 的規則已經寫得很清楚：**MIPI 不能有 stub。**
 
@@ -81,17 +85,17 @@ IT66121 RGB 輸入  ┘
 ```
 SoC PD0~PD9  ═══════════════════════════════▶  MIPI FPC 座   （直通，阻抗控制）
                    ║
-                   ╚═[0Ω × 10]══════════════▶  IT66121 低位輸入
+                   ╚═[0Ω × 10]══════════════▶  ADV7511 低位輸入
 
-SoC PD10~PD21 ─────────────────────────────▶  IT66121        （不衝突，直接接）
+SoC PD10~PD21 ─────────────────────────────▶  ADV7511        （不衝突，直接接）
 ```
 
 ```
-要跑 MIPI    0Ω 不焊  →  IT66121 輸入斷開，MIPI 線上乾淨
+要跑 MIPI    0Ω 不焊  →  ADV7511 輸入斷開，MIPI 線上乾淨
 要跑 HDMI    0Ω 焊上  →  RGB 全部接通
 ```
 
-**IT66121 本體照樣上件**（交給 PCBA，QFN64 不手焊），只是輸入被 0Ω 斷開。
+**ADV7511 本體照樣上件**（LQFP-100 有腳但底部仍有 EPAD，交給 PCBA），只是輸入被 0Ω 斷開。
 切換要動烙鐵，但 0402 0Ω 拆焊很容易。
 
 ⚠ 這不違反 §2.1「MIPI 不能加串聯電阻」的規則 ——
@@ -111,13 +115,14 @@ FR4 傳播延遲      ~6.7 ps/mm
 
 放遠了就白做 —— stub 還在，只是換了個位置。
 
-### 1.4 IT66121 在 MIPI 模式要關掉
+### 1.4 ADV7511 在 MIPI 模式要關掉
 
-0Ω 拆掉後 IT66121 的輸入浮接。**必須用 GPIO 控制它的 `SYSRSTN`（或電源），
+0Ω 拆掉後 ADV7511 的輸入浮接。**必須用 GPIO 控制它的 reset（或電源），
 在 MIPI 模式時讓它保持 reset**，避免它亂驅動或耗電。
 
 ```
-[ ] 原理圖上 IT66121 的 SYSRSTN 接一支 GPIO，不要直接上拉
+[ ] 原理圖上 ADV7511 的 RESET# 接一支 GPIO，不要直接上拉
+[ ] 確認 ADV7511 的 reset 腳名稱與極性（回 datasheet Pin Description）
 ```
 
 ---
@@ -131,7 +136,7 @@ T113-S3 Display Engine
         │
         ├──▶ PD0~PD9   ──┬──▶ MIPI DSI 4-lane ──▶ FPC 座 ──▶ 面板   ★ 優先
         │                 └─[0Ω]──┐
-        └──▶ PD10~PD21 ───────────┴──▶ IT66121 ──▶ HDMI Type-A
+        └──▶ PD10~PD21 ───────────┴──▶ ADV7511 ──▶ HDMI Type-A
 ```
 
 ---
@@ -202,17 +207,62 @@ IOVCC 1.8/3.3V   介面電壓
 
 ---
 
-## 3. RGB 並列 → IT66121 → HDMI
+## 3. RGB 並列 → ADV7511 → HDMI
 
-### 3.1 為什麼選 IT66121
+### 3.1 橋接晶片：IT66121 → **ADV7511**（v0.4 更換）
+
+#### 換掉的理由：IT66121 原廠停產
 
 ```
-drivers/gpu/drm/bridge/ite-it66121.c   ← mainline 就有
-QFN64 9×9mm + 底部 GND pad             ⚠ 非 LQFP，手焊高風險，交給 PCBA
-Allwinner 生態常用                      ← 有人踩過坑
+IT66121FN   LCSC C2684803   庫存 0   "This product is no longer manufactured."
 ```
 
-LT8618SX 在 Linux 上通常要靠廠商 blob 或自己寫 driver。**第一塊板不在 driver 上冒險。**
+不是缺貨，是停產。完整盤點見 [009-bom.md](009-bom.md) §3。
+並列 RGB 輸入 + 有貨 + 有 mainline driver 的候選只剩兩顆（ADV7511 / TFP410），
+外加一顆有貨但無 mainline 的（MS7210）。
+
+#### ⚠ 選型判準已經改變
+
+v0.3 之前的判準是「**第一塊板不在 driver 上冒險**」—— 所以挑 driver 最省事的。
+
+**這條判準對本專案已不適用。** 新的目標是累積 **HDMI/DP kernel driver porting
+與 IC 驗證**的實作經驗（對應 MediaTek HDMI 軟韌體工程師職缺的工作內容），
+**driver 工作本身就是要練的東西，省事等於沒練到。**
+
+| | ADV7511 | TFP410 | MS7210 |
+|---|---|---|---|
+| driver porting | mainline `adv7511`，接到 sunxi TCON 是完整的 bridge 移植 | `ti-tfp410.c` 是啞橋接，**連 I2C 都沒有**，只有一支 power-down GPIO | 無上游，要從零寫（無暫存器文件） |
+| 可驗證的項目 | EDID/DDC · HPD · HDCP · audio I2S + N/CTS · AVI/Audio InfoFrame · CEC · CSC | 只有 HPD + DDC 直通 | 功能齊，但驗的是自己寫的 driver |
+| 價格 | $13.75 | $6.28 | $1.75 |
+| 封裝 | LQFP-100 14×14 +EPAD | HTQFP-64 10×10 | QFN-64-EP 9×9 |
+
+**選 ADV7511。** TFP410 是 DVI serializer，HDMI 協定層幾乎什麼都沒有，練不到東西；
+MS7210 要從零寫 driver，沒有上游可對照，第一塊板風險過高且經驗不易轉移。
+
+#### 這條路確實走得通
+
+`(drivers/gpu/drm/sun4i/sun4i_rgb.c, torvalds/linux master, 2026-09-20)`
+
+```c
+drm_of_find_panel_or_bridge(tcon->dev->of_node, 1, 0, &rgb->panel, &rgb->bridge);
+drm_bridge_attach(encoder, rgb->bridge, NULL, 0);
+```
+
+**sunxi TCON 的並列 RGB 輸出原生支援掛外部 `drm_bridge`。**
+所以「把 bridge driver 接到新 SoC 的顯示輸出」有骨架可循，不是從虛空開始。
+
+⚠ 但 `sun4i_rgb.c` 是 **panel 或 bridge 二選一**，不能同時掛。
+
+#### 額外紅利：同一份 driver 也涵蓋 DSI 輸入
+
+mainline `drivers/gpu/drm/bridge/adv7511/` 目錄同時含 **adv7533 / adv7535（MIPI DSI → HDMI）**。
+這塊板本來就有 MIPI DSI —— **同一份 codebase 可以練兩條輸入路徑。**
+
+#### ⚠ 缺口：DP 這塊板給不了
+
+T113-S3 沒有 DP 輸出，三個方案都補不了。
+DP 要靠 [ROADMAP](../ROADMAP.md) §6 的第 3 塊板（高速差分／DP 轉接板），
+**該板的優先序應往上提。**
 
 ### 3.2 RGB 並列走線
 
@@ -257,18 +307,8 @@ v0.2 的 `R[7:2]` 寫法暗示 PD0 是 MSB，也是錯的。
 
 #### 但接線時不會踩到這個坑 —— 因為兩顆晶片用同一套 D 索引
 
-IT66121 的視訊輸入腳就叫 `D[23:0]` `(IT66121 DS p.6 Digital Video Input Pins)`，
-而且同樣是 high-aligned。**所以按 D 編號 1:1 接就對了，不必經過顏色名稱：**
-
-```
-T113 LCD0-D23 ──▶ IT66121 D23        （R5）
-T113 LCD0-D18 ──▶ IT66121 D18        （R0）
-T113 LCD0-D15 ──▶ IT66121 D15        （G5）
-   ...
-T113 LCD0-D2  ──▶ IT66121 D2         （B0）
-
-IT66121 D17 / D16 / D9 / D8 / D1 / D0  ──▶ GND
-```
+ADV7511 的視訊輸入腳叫 `D[35:0]`（24-bit 模式用 D[23:0]），同樣是 high-aligned。
+**所以按 D 編號 1:1 接就對了，不必經過顏色名稱。** 完整接線見 §3.2.1。
 
 **用顏色名稱接線才會出錯，用 D 索引接線不會。** 原理圖上一律標 D 編號。
 
@@ -313,7 +353,7 @@ v0.1 寫    24 資料 + 4 控制 = 28 條單端      ✗
 解析度上限   RGB 1920×1080@60  /  MIPI DSI 4-lane 1920×1200@60   (DS §2.6 p.6)
 ```
 
-### ✅ pixel clock 上限：SoC 200 MHz，IT66121 165 MHz —— 瓶頸在橋接晶片
+### ✅ pixel clock 上限：SoC 200 MHz，橋接晶片 165 MHz —— 瓶頸在橋接晶片
 
 `(DS §5.11.1 Table 5-18 LCD HV_IF Interface Timing Constants, p.61)`
 
@@ -323,11 +363,13 @@ DCLK cycle time    tDCLK    Min 5 ns    →   DCLK max = 200 MHz
 
 ```
 T113-S3 TCON_LCD    200 MHz      (DS Table 5-18)
-IT66121FN           165 MHz      (IT66121 DS p.17 Fpixel max)
+ADV7511             165 MHz      (ADI 產品頁：input up to 165 MHz / output 225 MHz)
 1080p@60 所需        148.5 MHz    CEA-861
                     ───────────
-瓶頸                 IT66121，不是 SoC
+瓶頸                 橋接晶片，不是 SoC
 ```
+
+> 巧合：IT66121 的上限也是 165 MHz，**換晶片沒有改變這個結論。**
 
 功能面的 `up to 1920 x 1080@60fps` `(DS §2.6.1 p.6 / UM §5.1.1 p.397)` 是頻寬結論，
 **接腳時序本身容許到 200 MHz。** 兩個數字不衝突，但引用時要分清楚。
@@ -359,22 +401,28 @@ PLL_VIDEO0(4X) 預設 1188 MHz   (UM §3.3.6.4 p.76)
 ⚠ **Table 5-18 沒有給 LCD 輸出的 setup/hold 或 Tco**，只有 cycle time 與時序常數關係。
 所以 T113 側的輸出 skew 仍是未知數 —— 下面的 budget 計算要保留餘量。
 
-### IT66121 側的上限倒是明確
+### ⚠ 橋接晶片側的 AC 規格要重查
 
-`(IT66121 DS p.2 / Video AC Timing Specification p.17)`
+下面這組是 **IT66121** 的數字 `(IT66121 DS p.2 / p.17)`，**換成 ADV7511 後必須重新取得**：
 
 ```
-Fpixel   單邊緣取樣   25 ~ 165 MHz      ← 148.5 落在範圍內 ✓
+Fpixel   單邊緣取樣   25 ~ 165 MHz
 TS       setup        1.5 ns min
 TH       hold         0.7 ns min
 TPJ      PCLK jitter  2.0 ns max
 TPDUTY   工作週期      40% ~ 60%
 ```
 
-⚠ **下限 25 MHz 也是限制**：想跑很低的解析度（例如 480i 原生 13.5 MHz）
-必須靠 IT66121 的 pixel-repeat 把時脈乘上去，不能直接餵。
+```
+[ ] 取得 ADV7511 datasheet 的 Video Input AC Timing：
+     tSU / tHD / PCLK jitter 容許 / duty cycle
+     → 下面的 skew budget 要用 ADV7511 的數字重算一次
+```
 
-### skew budget（用 IT66121 的真實數字重算）
+⚠ **ADI 官網的 PDF 直連會擋 curl 與 WebFetch**（ECONNRESET／逾時），
+要從 DigiKey、Mouser 等鏡像抓，或手動下載放進 `docs/reference/peripherals/`。
+
+### skew budget（⚠ 以下用 IT66121 數字算，待換 ADV7511 數字重算）
 
 ```
 148.5 MHz → Tpixel = 6.734 ns
@@ -388,16 +436,20 @@ FR4 傳播延遲 ~6.7 ps/mm
 **在 100×100mm 的板子上，兩條走線最多也差不到 149mm —— 等長在物理上不可能成為瓶頸。**
 實作時對 CK 等長做到 ±10mm 即可，那是整齊，不是需求。
 
+> 這個**結論**對 ADV7511 幾乎確定仍成立（setup/hold 要差到 4 ns 以上才會翻盤，
+> 而 165 MHz 級的並列介面不會有那種規格），但**算式要用 ADV7511 的數字重跑一次**
+> —— 專案規則是「不把 A 晶片的數字掛到 B 晶片上」，這正是 v0.3 剛抓到的那類錯誤。
+
 > ROADMAP 風險 ⑤ 把「RGB 並列等長」列為主要風險，**這個定性要下修**。
 > 等長不是風險，SSO 與 jitter 才是。
 
 **真正的殺手是 SSO noise（Simultaneous Switching Output）**：22 條線同時翻轉造成的地彈與 EMI。
-地彈會直接吃掉 IT66121 那 2.0 ns 的 jitter 預算 —— 這才是 148.5 MHz 下會出事的路徑。
+地彈會直接吃掉橋接晶片的 jitter 預算 —— 這才是 148.5 MHz 下會出事的路徑。
 
 緩解手段：
 
 ```
-串聯阻尼電阻   每條 22~33Ω，靠近驅動端（IT66121 側或 SoC 側）
+串聯阻尼電阻   每條 22~33Ω，靠近驅動端（ADV7511 側或 SoC 側）
 slew rate      SoC 端若可設定，降到剛好夠用
 GND 回流       走線下方必須是完整 GND 平面
 分組           資料線分成幾組，中間穿插 GND 走線
@@ -406,51 +458,74 @@ GND 回流       走線下方必須是完整 GND 平面
 ⚠ 22 條線加上串聯電阻 = **22 顆 0402 電阻**，再加 §1.2 的 **10 顆 0Ω 隔離**，
 共 32 顆電阻要預留擺放空間。
 
-⚠ PD0~PD9 那 10 條的阻尼電阻要放在 **0Ω 之後、靠 IT66121 那側**，
+⚠ PD0~PD9 那 10 條的阻尼電阻要放在 **0Ω 之後、靠 ADV7511 那側**，
 不能放在主幹上 —— 主幹是 MIPI 的路徑，不能串任何東西。
 
-### 3.2.1 ⚠ IT66121 要 1.2V —— 全板多一條電源軌
+### 3.2.1 ADV7511 的電源與電平
 
-`(IT66121 DS p.7 Power/Ground Pins；p.14 Functional Operation Conditions)`
-
-```
-IVDD12    1.2V   pin 8, 35, 56    核心邏輯
-AVCC12    1.2V   pin 23           HDMI 類比前端      ⚠ 註記要求「should be regulated」
-PVCC12    1.2V   pin 18           HDMI PLL           ⚠ 同上
-DVDD12    1.2V   pin 28           HDMI 數位前端
-                                  ───────────────
-VCC33     3.3V   pin 9            內部 ROM
-PVCC33    3.3V   pin 19           HDMI PLL           ⚠ 同上
-OVDD33    3.3V   pin 13           5V-tolerant IO（DDC / HPD / CEC / I2C）
-OVDD      1.8 / 2.5 / 3.3V  pin 1, 34   ← RGB 輸入腳的電源，可選
-```
-
-**v0.2 之前的規格寫「4 組電源域」，漏掉了這一條。** 實際是 5 組外部電源軌。
+`(ADV7511W Hardware User's Guide Rev.A, p.11 / p.17 / p.41)`
 
 ```
-Functional Operation Conditions   1.14 / 1.2 / 1.26 V
-VCCNOISE                          Max 100 mVpp     ← 雜訊要求很緊
-全片功耗                           < 70 mW @1080p60  (IT66121 DS p.3)
+DVDD      1.8V   數位核心與 IO
+AVDD      1.8V   TMDS 輸出類比
+PVDD      1.8V   PLL          ← 最敏感
+BGVDD     1.8V   band-gap
+DVDD_3V   3.3V
+
+1.8V 功耗  325 mW  →  約 180 mA
+3.3V 功耗    1 mW
 ```
 
-功耗只有 70 mW，**1.2V 的電流很小（估 < 50 mA）**，用一顆 3.3V→1.2V 的 LDO 即可：
+#### ✅ 視訊輸入腳 3.3V 可直接驅動
 
 ```
-壓降 2.1V × 50 mA ≈ 105 mW     SOT-23 封裝散得掉
-LDO 而非 DC-DC 的理由：VCCNOISE 只給 100 mVpp，DC-DC 的切換漣波不值得冒險
-AVCC12 / PVCC12 另外用磁珠 + 0.1µF + 10µF 從 1.2V 幹線隔開（datasheet 要求 regulated）
+D[35:0] / CLK / HSYNC / VSYNC / DE
+  "Supports typical CMOS logic levels from 1.8V up to 3.3V."
 ```
 
-詳見 [001-power.md](001-power.md) §1 與 §2.5。
+**VCC-PD = 3.3V 的決定不必推翻，22 條 RGB 線不需要電平轉換。**
 
-#### OVDD 選 3.3V
+#### ⚠ 但 1.8V 軌要加大
 
-OVDD 決定 RGB 輸入腳的電平，1.8 / 2.5 / 3.3V 皆可 `(IT66121 DS p.14)`，
-**所以 IT66121 對 VCC-PD 的電壓沒有任何限制** —— 007-pinmap.md §8 的待決事項
-「VCC-PD 要同時滿足 MIPI 與 IT66121」，IT66121 這一半不存在。
+```
+001-power.md §2.2 原本的 1.8V 已知負載      約  52 mA
+ADV7511                                    約 180 mA
+                                           ──────────
+                                           約 232 mA
+晶片內建 LDOA 上限                             260 mA   ← 貼滿，且 VDD18-DRAM 仍是 TBD
+```
 
-選 3.3V 的理由：`VIH = 2.0V min`，配 T113 的 3.3V 輸出有 1.3V 餘裕；
-選 1.8V 則 `VIH = 1.2V`，餘裕只剩 0.6V，而 22 條線的 SSO 地彈就吃這個餘裕。
+**外部 1.8V LDO 變成必須，且不能用 XC6206（典型僅 200 mA）。**
+改用 **AP2112K-1.8TRG1**（`C176944`，600 mA）。
+
+ADI 另外建議把四個 1.8V 域**分成 3 組獨立的 PCB 電源域各加 LC 濾波**（p.41 Figure 21），
+PVDD（PLL）最敏感。這是額外的 layout 工作量。
+
+#### 電源域淨變化：5 組回到 4 組
+
+```
+IT66121 方案   3.3 / 1.5 / 0.9 / 1.8 / 1.2   5 組
+ADV7511 方案   3.3 / 1.5 / 0.9 / 1.8          4 組   ← 1.2V 消失，1.8V 加大
+```
+
+#### RGB666 接到 ADV7511 的 D[23:18] / D[15:10] / D[7:2]
+
+ADV7511 的輸入腳是 `D[35:0]`（最寬支援 36-bit deep color），
+**24-bit 模式用 D[23:0]，與 T113 的 `LCD0-D[23:0]` 同樣 high-aligned。**
+
+```
+T113 LCD0-D23..D18  →  ADV7511 D23..D18      （R5..R0）
+T113 LCD0-D15..D10  →  ADV7511 D15..D10      （G5..G0）
+T113 LCD0-D7..D2    →  ADV7511 D7..D2        （B5..B0）
+
+ADV7511 D17/D16 · D9/D8 · D1/D0  →  GND
+ADV7511 D35..D24                 →  GND（deep color 未用）
+```
+
+```
+[ ] 待確認：ADV7511 未用的 D[35:24] 是接 GND 還是浮接
+             → 回 ADV7511 datasheet 的 Pin Description 確認
+```
 
 ---
 
@@ -484,7 +559,7 @@ CEC         可選，V1 不做
 |---|---|---|
 | 差分對 | 5 | 4（TMDS） |
 | 單端線 | 0 | **22** |
-| 額外零件 | FPC 座 | IT66121 + 22 顆阻尼電阻 + 10 顆 0Ω + ESD + **1.2V LDO** |
+| 額外零件 | FPC 座 | ADV7511 + 22 顆阻尼電阻 + 10 顆 0Ω + ESD |
 | 板面積 | 小 | **大** |
 | 驗證難度 | 高（要有面板、要調參數） | **低（插螢幕就能看）** |
 
@@ -503,11 +578,73 @@ MIPI 還要對面板 timing、init sequence、lane 設定，變因多得多。
 [ ] RGB 22 條對 CK 等長，串聯阻尼電阻已放且靠近驅動端
 [ ] HDMI ESD 保護已放，電容 <1pF
 [ ] DDC 上拉到 5V
-[x] IT66121 的 RGB 輸入時脈上限 ≥ 目標解析度所需
-      → Fpixel 25~165 MHz，1080p60 的 148.5 MHz 在範圍內  (IT66121 DS p.17)
-[ ] IT66121 的 1.2V 軌已放（IVDD12 / AVCC12 / PVCC12 / DVDD12），且 AVCC12 / PVCC12 有隔離
-[ ] IT66121 的 OVDD 接 3.3V，OVDD33 / VCC33 / PVCC33 接 3.3V
-[ ] IT66121 的 D[17:16] / D[9:8] / D[1:0] 接 GND（RGB666 未用的 6 個 LSB）
+[x] 橋接晶片的 RGB 輸入時脈上限 ≥ 目標解析度所需
+      → ADV7511 輸入上限 165 MHz，1080p60 的 148.5 MHz 在範圍內
+[ ] ADV7511 的 1.8V 域（DVDD/AVDD/PVDD/BGVDD）分成 3 組並各加 LC 濾波
+[ ] 1.8V LDO 為 600mA 等級（AP2112K-1.8），不是 XC6206
+[ ] ADV7511 的 DVDD_3V 接 3.3V
+[ ] ADV7511 的 D[17:16] / D[9:8] / D[1:0] 接 GND（RGB666 未用的 6 個 LSB）
+[ ] ADV7511 未用的 D[35:24] 處置已依 datasheet 確認
 [ ] 原理圖上 RGB 接線一律標 LCD0-D 編號，不用顏色名稱（避免 R/B 對調）
-[ ] ENTEST (pin 31) 經電阻接地、REXT (pin 20) 經 5.6kΩ 1% 接 AGND
+[ ] ADV7511 的 RESET# 接 GPIO（MIPI 模式時保持 reset）
+[ ] ADV7511 footprint：LQFP-100 14×14 + EPAD，依原廠機構圖驗算（見 008-footprint.md）
 ```
+
+---
+
+## 6. ADV7511 的 driver 工作（本專案的主要學習目標之一）
+
+### 6.1 Porting 路徑
+
+```
+drivers/gpu/drm/sun4i/sun4i_rgb.c        TCON 並列 RGB 輸出，支援掛 drm_bridge
+drivers/gpu/drm/bridge/adv7511/          mainline bridge driver
+  ├─ adv7511_drv.c      主體、DT binding、drm_bridge ops
+  ├─ adv7511_cec.c      CEC
+  ├─ adv7511_audio.c    HDMI audio（I2S → N/CTS 重生）
+  └─ adv7533.c          MIPI DSI 輸入版（adv7533/adv7535）
+```
+
+DTS 大致形狀：
+
+```dts
+&tcon0_out {
+    tcon0_out_adv7511: endpoint { remote-endpoint = <&adv7511_in>; };
+};
+
+&i2c1 {
+    hdmi@39 {
+        compatible = "adi,adv7511w";
+        reg = <0x39>;
+        interrupt-parent = <&pio>; interrupts = <...>;
+        adi,input-depth = <8>;
+        adi,input-colorspace = "rgb";
+        adi,input-clock = "1x";
+        ports {
+            port@0 { adv7511_in: endpoint { remote-endpoint = <&tcon0_out_adv7511>; }; };
+            port@1 { adv7511_out: endpoint { remote-endpoint = <&hdmi_con_in>; }; };
+        };
+    };
+};
+```
+
+⚠ 上面是依 `Documentation/devicetree/bindings/display/bridge/adi,adv7511.txt` 的
+**記憶形狀，不是抄自實機**。實作前要對著該 binding 逐欄核對。
+
+### 6.2 IC 驗證清單（對應職缺的「HDMI IC 驗證」）
+
+```
+[ ] HPD 偵測：插拔線時 /sys/class/drm/.../status 正確變化
+[ ] EDID 讀取：edid-decode 解出正確的 mode 清單
+[ ] mode setting：modetest -s 切換多組解析度都出畫面
+[ ] AVI InfoFrame：內容正確（色彩空間、量化範圍、aspect ratio）
+[ ] HDMI vs DVI 模式切換
+[ ] HDMI audio：I2S 餵進去，N/CTS 重生正確，螢幕喇叭有聲
+[ ] Audio InfoFrame 正確
+[ ] CEC：能收發基本訊息
+[ ] HDCP：認證流程能過（若螢幕支援）
+[ ] 熱插拔穩定性：反覆插拔不掉 link、不 oops
+```
+
+**這份清單就是這塊板在 driver 層面的驗收標準。**
+RGB666 只有 18-bit，所以量化範圍與 deep color 那幾項的預期值要相應調整。

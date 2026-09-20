@@ -719,3 +719,122 @@ VCC-PD 那一條的推論(D-PHY 吃 VCC-LVDS)datasheet 沒有明文,
 
 規則補一條:**驗收清單上的 `[x]` 要標出處頁碼。** 沒有頁碼的勾等於沒查。
 這次能抓出來,是因為為了查 TCON 又把 §5 和 §2.6 重讀了一遍。
+
+---
+
+## 2026-09-20 · 橋接晶片換人:IT66121 停產,改 ADV7511 —— 順帶把選型判準整個換掉
+
+### 起因是查料,結果是改設計
+
+階段 0 最後一項「零件料號逐項查證」,本來以為只是填價格。
+查到第二顆就卡住:
+
+```
+IT66121FN  C2684803  庫存 0  "This product is no longer manufactured."
+```
+
+**如果只看 `stockCount == 0`,會以為是缺貨,等補貨就好。**
+是 `noBuyReason` 那句話把它從「等一週」變成「重畫原理圖」。
+
+```
+規則:查料況要看停產標記,不是只看庫存數字。
+```
+
+### 找替代品的過程中,判準自己變了
+
+盤點並列 RGB 輸入 + 有貨 + 有 mainline driver 的候選,只剩兩顆,外加一顆沒 driver 的。
+我照原本的判準(002-display.md §3.1:「第一塊板不在 driver 上冒險」)推薦了 **TFP410**
+—— 最便宜、電源最簡單、driver 最省事。
+
+然後 Nick 丟了一份職缺過來。我以為是 bootloader(網址的 query 是 bootloader),
+抓下來一看是 **HDMI軟韌體工程師(竹北)**:
+
+```
+1. HDMI and DP Linux/Android Kernel driver porting
+2. HDMI and DP IC 驗證
+3. 相關產品客戶 support
+```
+
+**判準整個倒過來。** 原本是「driver 越省事越好」,現在是「driver 工作就是要練的東西」。
+
+在新判準下 TFP410 從第一名變最後一名:
+
+```
+TFP410   DVI serializer,連 I2C 都沒有,只有一支 power-down GPIO
+         ti-tfp410.c 的「porting」約等於寫 20 行 DTS
+         沒有 audio / InfoFrame / HDCP / CEC → HDMI 協定層幾乎空白
+```
+
+改選 **ADV7511**:完整 HDMI、mainline `adv7511/`、驗證面涵蓋
+EDID/HPD/HDCP/audio(N,CTS)/InfoFrame/CEC/CSC。
+
+**這件事本身是個教訓:選型判準不是永久的,目標變了判準就要重審。**
+我差一點就用一條已經失效的判準,做了一個對新目標最差的選擇。
+
+### 查到這條路走得通
+
+```c
+// drivers/gpu/drm/sun4i/sun4i_rgb.c
+drm_of_find_panel_or_bridge(tcon->dev->of_node, 1, 0, &rgb->panel, &rgb->bridge);
+drm_bridge_attach(encoder, rgb->bridge, NULL, 0);
+```
+
+sunxi TCON 的並列 RGB 輸出**原生支援掛外部 drm_bridge**,所以 porting 有骨架。
+而且 mainline 的 `adv7511/` 目錄同時含 **adv7533/35(MIPI DSI→HDMI)**——
+這塊板本來就有 DSI,同一份 codebase 能練兩條輸入路徑。
+
+### 換料的連鎖反應比預期多
+
+一顆晶片換掉,動了七份文件:
+
+```
+電源域     5 組 → 4 組      1.2V 取消(那是 IT66121 要的)
+1.8V LDO   XC6206 → AP2112K  ADV7511 的 1.8V 吃 180mA,XC6206 只有 200mA 不夠
+1.8V 分域  新增要求          ADI 要求四個 1.8V 域分成 3 組各加 LC 濾波
+封裝       QFN-64 9×9 → LQFP-100 14×14   佔位從 9mm 級跳到 16mm 級
+placement  要重畫            板上變成兩顆 14mm 見方的晶片
+footprint  008 §4 作廢       ADV7511 機構圖還沒拿到
+PCBA 片數  3 → 2            這是 T113 實價 $22.25 逼的,不是換料逼的
+```
+
+**`1.8V LDO 從 XC6206 換成 AP2112K` 這條特別值得記**:
+v0.3 才寫過「多一顆 $0.05 的 XC6206 換掉一個未知數」,現在那顆容量不夠。
+**負載變了,已經選好的元件也要重算 —— 不能因為上一版定案就沿用。**
+
+### 刻意沒做的事:沒有填 ADV7511 的機構圖數字
+
+ADI 官網的 PDF 對 curl 和 WebFetch 全部回 **HTTP 000**(連線被擋),
+package outline 和 datasheet 都抓不到。
+
+我可以從產品頁、LCSC 規格欄、經銷商頁面湊出「LQFP-100 14×14, pitch 0.5」,
+但 **ROADMAP 風險 ① 寫得很清楚:footprint 一律回原廠機構圖,不信任二手來源。**
+
+T113-S3 的 EPAD 就是靠讀原始機構圖才躲掉「六組尺寸選錯」那個坑。
+ADV7511 沒有理由用比較鬆的標準。所以 008 §4A **刻意留白**,只寫待辦。
+
+```
+[ ] 手動下載 ADV7511 datasheet → docs/reference/peripherals/
+    要的是:package outline(含 EPAD 尺寸)+ Video Input AC Timing(tSU/tHD/jitter)
+```
+
+同理,002-display.md 的 skew budget 還掛著 IT66121 的 TS=1.5ns/TH=0.7ns,
+已標註「待換 ADV7511 數字重算」。結論(等長不是瓶頸)預期不變,
+但**算式不能沿用別顆晶片的規格** —— 那正是這個月稍早才抓到的同一類錯誤。
+
+### 兩個要誠實承認的退步
+
+```
+1. 008-footprint.md v0.2 的結論「三顆全部有標準件可對,風險比預期低很多」
+   暫時收回。ADV7511 的機構圖還沒拿到。
+
+2. ROADMAP §2.1 用「$8 —— 便宜到可以買備品」當選型理由。
+   T113-S3 實價 $22.25,那條理由不成立。
+   選型結論不變(內建 DDR3 仍是決定性優勢),但論述要改。
+```
+
+### DP 的缺口
+
+職缺寫 HDMI **and** DP。這塊板三個方案都給不了 DP —— T113-S3 沒有 DP 輸出。
+ROADMAP §6 的第 3 塊板(高速差分/DP)從「構想」升級為明確的下一步,
+而且重點要從純 layout 練習往「能跑 DP driver、能做 DP 驗證」偏移 ——
+純被動轉接板量得到訊號,但沒有 driver 可寫。
