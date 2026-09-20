@@ -1,6 +1,6 @@
 # 001 · 電源樹與上電時序
 
-版本：v0.7 · 2026-09-20（Figure 23/24 讀完:**ADV7511 要自己專屬的 1.8V LDO**,三組分法定案）
+版本：v0.8 · 2026-09-21（RY1303 datasheet 取得:**EN 沒有內建順序**,那是我寫錯的;數值定案移到 011)
 
 **資料來源**：`T113-S3_Datasheet_v1.6_20220303.pdf`，以下標註格式為 `(DS §5.3 p.45)`。
 交叉驗證對象：`MangoPi_MQ-R_sch_v1.6.pdf`（分壓值已驗算，見 §2.4）。
@@ -379,13 +379,22 @@ v0.1 的立場是「分離式，不用 PMIC」。查完 MangoPi 後發現中間�
 | | 分離式 ×3 | **三路 DC-DC（如 RY1303）** | PMIC（AXP 系列） |
 |---|---|---|---|
 | 可觀測性 | 每軌獨立量測 | **三組電感與 feedback 都在外面，照樣量得到** | 黑盒子 |
-| 上電時序 | EN 腳自己串 | **EN1/EN2/EN3 內建順序** | 內部狀態機，改不了 |
+| 上電時序 | EN 腳自己串 | EN1/EN2/EN3 **獨立控制**（要自己做時序） | 內部狀態機，改不了 |
 | 板面積 | 大 | 中 | 小 |
 | 故障處理 | 換單顆 | 換整顆（三路一起沒） | 換整顆 |
 | 料況 | 通用料 | ⚠ **中國小廠料，須查 LCSC** | 專用料 |
 
 **排除 PMIC 的理由依然成立**（內部時序看不見），但**三路 DC-DC 沒有那個問題**——
 三個電感、三組分壓電阻都露在板子上，探棒照樣量。
+
+> ⚠ **v0.8 更正**：上表原本寫 RY1303 的優點是「EN1/EN2/EN3 **內建順序**」。
+> **錯的。** datasheet 寫的是
+> `"the independent enable control makes the designer have the greatest flexibility
+> to optimize timing for power sequencing purposes"` ——
+> **三支 EN 是獨立輸入，沒有任何內建排序功能，時序要自己做。**
+>
+> 錯誤來源是把「有三支 EN 腳」當成「有排序功能」。
+> **零件的彈性不等於零件幫你做事。**
 
 ```
 [ ] 待決策：查 LCSC 的 RY1303 料況（Basic/Extended、庫存、價格）
@@ -690,16 +699,18 @@ B. 背面 via 補焊
 進原理圖前必須答完：
 
 ```
-[ ] VDD18-DRAM (pin 50) 接 LDOA-OUT 還是外部 1.8V？（開 MangoPi 原理圖原頁）
+[x] VDD18-DRAM (pin 50) → **MangoPi 接 LDOA-OUT**（原理圖 p.3 目視確認）
+     本板改接外部 +1V8_SOC，內建 LDOA 不使用（見 011-power-tree.md §3.1）
 [ ] MIPI DSI D-PHY 的電源軌與 4-lane 電流
 [ ] 上兩項合計是否超過 LDOA 的 260 mA → 決定要不要外部 1.8V
-[ ] RY1303 的 LCSC 料況 → 決定三路 DC-DC 或分離式 ×3
-[ ] MangoPi 的 RESET 腳實際有無電容、多大 → 決定要不要加 reset supervisor
+[x] RY1303 料況 → 庫存 23,969、$0.20、datasheet 已取得 → **採用三路 DC-DC**
+[x] MangoPi 的 RESET → **R74 10K 上拉 LDOA-OUT + C84 0.1µF**，RC 僅 1 ms
+     規格要 64 ms，**差 60 倍 → 確認它沒滿足規格,本板加 APX803 supervisor**
 [x] VCC-PD / VCC-PE / VCC-PG 各選 1.8V 還是 3.3V → **三者全選 3.3V**（見 §1.1）
 [x] 1.8V LDO 選型 → **AP2112K-1.8TRG1 (C176944, 600mA)**，XC6206 的 200mA 不夠
 [x] ADV7511 五個 1.8V 域 → **3 組**：DVDD ／ AVDD+PVDD ／ PLVDD+BGVDD，各加 10µH+10µF
 [x] ADV7511 要**自己專屬的 1.8V LDO**（§6.8）→ 1.8V 拆成兩條
-[ ] 電源樹圖與 SPEC §5 改成兩條 1.8V
+[x] 電源樹數值全部定案 → **見 [011-power-tree.md](011-power-tree.md)**
 [ ] VCC-PD = 3.3V 時 MIPI 是否正常 —— 找有接 DSI 面板的參考設計核對
 [ ] Table 5-2 / 5-3 的數字回 p.45-48 原頁目視核對（pdftotext 欄位有錯位）
 ```

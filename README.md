@@ -86,7 +86,7 @@ PCB      4 層 · 阻抗控制 · 100×100mm 以內
 [x] datasheet 查證（封裝 / 電源 / 顯示鏈路）
 [x] BOM 料況查證 —— IT66121 停產，橋接改用 **ADV7511**（見 009-bom.md）
 [x] ADV7511 原廠 PDF 已取得,腳位表與 layout 建議已抄進版控
-[~] 原理圖 —— T113-S3 符號完成(128 腳已核對)
+[~] 原理圖 —— 符號完成、電源樹數值定案
 [ ] PCB layout
 [ ] 出圖驗證
 [ ] 下單
@@ -111,4 +111,5 @@ PCB      4 層 · 阻抗控制 · 100×100mm 以內
 | [docs/design/008-footprint.md](docs/design/008-footprint.md) | 機構圖實測、EPAD 尺寸、footprint 驗算 |
 | [docs/design/009-bom.md](docs/design/009-bom.md) | **BOM 料況查證、橋接晶片改選 ADV7511** |
 | [docs/design/010-symbol.md](docs/design/010-symbol.md) | **T113-S3 符號建立、128 腳核對、四處非連號** |
+| [docs/design/011-power-tree.md](docs/design/011-power-tree.md) | **電源樹定案:分壓值、時序電路、RESET supervisor** |
 | [notes/devlog.md](notes/devlog.md) | 開發日誌 |
