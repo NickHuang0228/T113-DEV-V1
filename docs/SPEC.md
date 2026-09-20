@@ -450,7 +450,8 @@ MQ-R 沒有乙太網路所以不衝突，我們有，就衝突了。）
 - [x] **ADV7511 機構圖數字已取得** `(HW Guide §5.1 p.21 Figure 7)`
       本體 14.00 SQ · 含腳 16.00 SQ · pitch 0.50 BSC · b 0.22 · L 0.60 · **無 EPAD**
       → KiCad `LQFP-100_14x14mm_P0.5mm` 可直接用，不需自建
-- [x] **原始 PDF 已入庫**：`docs/reference/peripherals/ADV7511_Hardware_Users_Guide.pdf`（58 頁 Rev D）
+- [x] **原始 PDF 已取得**：`docs/reference/peripherals/ADV7511_Hardware_Users_Guide.pdf`（58 頁 Rev D）
+      ⚠ 依專案政策 PDF 不進版控；取得方式記在 `docs/reference/README.md`
 - [x] RTL8201F 封裝機構圖 → QFN-32 5×5，pitch 0.5，EPAD 3.35×3.35 `(RTL DS §10.1, p.55, JEDEC MO-220)`
 - [x] VCC-PD / VCC-PE / VCC-PG → **全部 3.3V**（見 001-power.md §1.1）
 - [ ] RY1303（三路 DC-DC）的 LCSC 料況 → 決定用三路或分離式 ×3

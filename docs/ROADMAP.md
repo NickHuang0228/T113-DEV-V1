@@ -234,7 +234,7 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
 - [x] RTL8201F 機構圖已取得，KiCad 標準件對得上（見 008-footprint.md §5）
 - [x] **ADV7511 機構圖數字已取得**：ST-100 / MS-026-BED / 本體 14.00 / 含腳 16.00 / pitch 0.50
       **無 EPAD** → KiCad `LQFP-100_14x14mm_P0.5mm` 直接可用，不需自建
-- [x] **ADV7511 原始 PDF 已入庫**（58 頁 Rev D），完整腳位表與 §7 layout 建議已取
+- [x] **ADV7511 原始 PDF 已取得**（依專案政策 PDF 不進版控，來源記在 reference/README.md）（58 頁 Rev D），完整腳位表與 §7 layout 建議已取
 - [ ] ⚠ RTL8201F 確認用 datasheet §10.1 的 QFN-32，不是 §10.2 LQFP-48 / §10.3 QFN-48
 - [ ] 電源上電時序對照 datasheet，寫成文件記錄
 - [ ] **1.8V 拆成兩條**：SoC 一顆、**ADV7511 專屬一顆**（ADI §6.8 要求）

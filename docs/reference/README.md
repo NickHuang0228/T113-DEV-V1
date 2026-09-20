@@ -4,6 +4,42 @@
 
 ---
 
+## 周邊 IC
+
+| 檔案 | 頁數 | 說明 | 來源 |
+|---|---|---|---|
+| `peripherals/ADV7511_Hardware_Users_Guide.pdf` | 58 | **HDMI 橋接主文件**（Rev D, 2011-07）—— 電氣規格 §4、腳位表 §5、Layout §7 | [analog.com](https://www.analog.com/media/en/technical-documentation/user-guides/ADV7511_Hardware_Users_Guide.pdf) |
+| `peripherals/RTL8201F-VB-CG_datasheet_v1.4.pdf` | 67 | 乙太 PHY | Realtek |
+| `peripherals/CH340DS1_datasheet.pdf` | — | USB-UART | WCH |
+| `peripherals/IT66121FN_datasheet_v1.02.pdf` | 40 | ⚠ **已停產，設計已改用 ADV7511**；保留作對照 | ITE |
+
+⚠ **ADV7511 的 PDF 無法自動下載。** ADI 封鎖 curl / PowerShell / WebFetch
+（HTTP 000 或連線重置），各大鏡像站也拿不到正確檔案。
+**必須用瀏覽器開上面的連結，手動按下載鈕**（Chrome 不接受程式合成的點擊）。
+
+數字摘要已整理在 `peripherals/ADV7511KSTZ_extracted.md`（**這份有進版控**），
+換機器時就算一時拿不到 PDF，設計也不會卡住。
+
+### ADV7511 章節速查
+
+```
+§4    p.12-13   Table 1 電氣規格（VIH 1.35~3.5V · tVSU 1.0ns · tVHLD 0.7ns · 1.8V 325mW）
+§5.1  p.18      Figure 6 腳位圖   ★ D[35:0] 的索引↔腳號只能從這張圖看
+§5.1  p.19-20   Table 3 完整腳位表（R_EXT 887Ω · PD/AD 一腳兩用）
+§5.1  p.21      Figure 7 機構圖（ST-100 · MS-026-BED · 14×14 · 無 EPAD）
+§6.8  p.50      Power Domains  ★「要自己專屬的 1.8V LDO」這句在這裡
+§6.8  p.50      Figure 23 三組分法（DVDD ／ AVDD+PVDD ／ PLVDD+BGVDD）
+§6.8.1 p.50     無上電時序要求
+§7.1  p.52      Figure 24 雜訊上限曲線（200k~1MHz 只容許 1.3 mV rms）
+§7.2~7.7 p.53-54 CLK 阻抗控制 · 上拉值 · R_EXT · CEC
+§7.8  p.55      Figure 27 參考原理圖
+```
+
+⚠ **規格分散在 §4 / §5 / §6.8 / §7 四處** —— 只讀 §7「PCB Layout Recommendations」
+會漏掉 §6.8 的專屬 LDO 要求。這是實際踩過的坑。
+
+---
+
 ## Allwinner T113-S3
 
 | 檔案 | 頁數 | 說明 | 來源 |
