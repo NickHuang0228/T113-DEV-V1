@@ -19,10 +19,8 @@ if hasattr(sys.stdout, "reconfigure"):
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CSV = os.path.join(ROOT, "data", "T113-S3_pinmap.csv")
-# 另一份獨立來源：tools/extract_pins.py 從 Table 4-2 機器抽出的表。
-# 兩份是不同方法得到的（目視抄 Figure 7-1 vs find_tables 抽 Table 4-2），
-# 互為驗證。只要還沒合併成一份，就每次生成時比對一次，防止偷偷長歪。
-CROSS_CSV = os.path.join(os.path.dirname(os.path.dirname(ROOT)), "T113-DEV-V1", "tools", "t113s3_pins.csv")
+# 2026-09-21：兩份腳位表已合併成單一來源（見 tools/merge_pinmap.py）。
+# 原本的交叉檢查（比對 tools/t113s3_pins.csv）改成對這份表自身的完整性檢查。
 OUT = os.path.join(ROOT, "symbols", "T113-DEV-V1.kicad_sym")
 
 PITCH = 2.54
@@ -95,21 +93,34 @@ def build_unit(idx, title, rows):
 
 
 def cross_check(rows):
-    """與 tools/t113s3_pins.csv 比對。兩份來源不同方法，不該有差異。"""
-    if not os.path.exists(CROSS_CSV):
-        print("  ⚠ 找不到 tools/t113s3_pins.csv，跳過交叉檢查")
-        return
-    other = {r["pin"]: r["name"].strip()
-             for r in csv.DictReader(io.open(CROSS_CSV, encoding="utf-8"))}
-    mine = {r["pin"]: r["name"].strip() for r in rows}
-    bad = [(p, other.get(p), mine.get(p))
-           for p in sorted(set(other) | set(mine), key=int)
-           if other.get(p) != mine.get(p) and p != "129"]   # 129=EPAD 只有本表有
-    if bad:
-        for p, o, m in bad:
-            print(f"  ✗ pin {p}: tools/={o}  data/={m}")
-        sys.exit("兩份腳位表不一致 —— 先查清楚哪一份錯了，不要直接生成")
-    print(f"  ✓ 與 tools/t113s3_pins.csv 交叉檢查一致（{len(other)} 腳）")
+    """腳位表自身的完整性檢查。
+
+    合併成單一來源後，沒有第二份表可以互相對照了，所以改成檢查這份表本身
+    站不站得住：腳號連號、必要欄位齊全、datasheet 欄位確實併進來了。
+    任何一項不過就中止，不要生出有問題的符號。
+    """
+    pins = sorted(int(r["pin"]) for r in rows)
+
+    # ① 腳號 1~128 連號，外加 129 = EPAD
+    expect = list(range(1, 130))
+    if pins != expect:
+        missing = sorted(set(expect) - set(pins))
+        dup = sorted(p for p in set(pins) if pins.count(p) > 1)
+        sys.exit(f"腳號不完整 —— 缺:{missing or '無'} 重複:{dup or '無'}")
+
+    # ② KiCad 必要欄位不可空
+    for r in rows:
+        for col in ("name", "bank", "type"):
+            if not r.get(col, "").strip():
+                sys.exit(f"pin {r['pin']} 的 {col} 是空的 —— 不要生出沒有{col}的符號")
+
+    # ③ datasheet 欄位確實併進來了（EPAD 不在 Table 4-2，本來就該空）
+    no_supply = [r["name"] for r in rows if not r.get("supply", "").strip()]
+    if no_supply != ["EPAD"]:
+        sys.exit(f"supply 欄位異常 —— 預期只有 EPAD 為空，實際:{no_supply}\n"
+                 "可能是 merge_pinmap.py 沒跑，或跑壞了")
+
+    print(f"  ✓ 腳位表完整性檢查通過（{len(rows)} 腳，含 EPAD）")
 
 
 def main():

@@ -1,130 +1,130 @@
-pin,name,bank,type,note
-1,PG6,PG,bidirectional,
-2,PG7,PG,bidirectional,
-3,PG8,PG,bidirectional,
-4,PG9,PG,bidirectional,
-5,PG10,PG,bidirectional,
-6,PG11,PG,bidirectional,
-7,PF0,PF,bidirectional,SDC0-D1
-8,PF1,PF,bidirectional,SDC0-D0
-9,PF2,PF,bidirectional,SDC0-CLK
-10,PF3,PF,bidirectional,SDC0-CMD
-11,PF4,PF,bidirectional,SDC0-D3
-12,PF5,PF,bidirectional,SDC0-D2
-13,PF6,PF,bidirectional,
-14,PC7,PC,bidirectional,SPI0-HOLD
-15,PC6,PC,bidirectional,SPI0-WP
-16,PC5,PC,bidirectional,SPI0-MISO
-17,PC4,PC,bidirectional,SPI0-MOSI
-18,PC3,PC,bidirectional,SPI0-CS0
-19,PC2,PC,bidirectional,SPI0-CLK
-20,VCC-PLL,PWR,power_in,1.8V
-21,REFCLK-OUT,SYS,output,
-22,DXOUT,SYS,output,24MHz 晶振
-23,DXIN,SYS,input,24MHz 晶振
-24,X32KOUT,SYS,output,32.768kHz 晶振
-25,X32KIN,SYS,input,32.768kHz 晶振
-26,VCC-RTC,PWR,power_in,1.8V
-27,RESET,SYS,input,低有效
-28,LDOA-OUT,PWR,power_out,內建 LDOA 輸出 1.8V @260mA
-29,LDO-IN,PWR,power_in,內建 LDO 輸入 3.3V
-30,LDOB-OUT,PWR,power_out,內建 LDOB 輸出 1.35V 預設 @400mA
-31,PE13,PE,bidirectional,
-32,PE12,PE,bidirectional,
-33,PE3,PE,bidirectional,RMII-TXCK
-34,VCC-PE,PWR,power_in,1.8/2.8/3.3V 可選 → 本板 3.3V
-35,PE2,PE,bidirectional,RMII-RXD1
-36,PE11,PE,bidirectional,
-37,PE10,PE,bidirectional,EPHY-25M
-38,PE9,PE,bidirectional,MDIO
-39,PE8,PE,bidirectional,MDC
-40,PE7,PE,bidirectional,RMII-RXER
-41,PE6,PE,bidirectional,RMII-TXEN
-42,PE5,PE,bidirectional,RMII-TXD1
-43,PE4,PE,bidirectional,RMII-TXD0
-44,PE0,PE,bidirectional,RMII-CRS-DV
-45,PE1,PE,bidirectional,RMII-RXD0
-46,VDD-SYS0,PWR,power_in,0.9V
-47,DZQ,DDR,passive,DDR ZQ 校準
-48,VCC-DRAM0,DDR,power_in,1.5V
-49,VCC-DRAM1,DDR,power_in,1.5V
-50,VDD18-DRAM,DDR,power_in,1.8V
-51,VDD-SYS1,PWR,power_in,0.9V
-52,PD22,PD,bidirectional,
-53,PD21,PD,bidirectional,LCD0-VSYNC
-54,PD20,PD,bidirectional,LCD0-HSYNC
-55,PD0,PD,bidirectional,LCD0-D2 / DSI-D0P
-56,PD1,PD,bidirectional,LCD0-D3 / DSI-D0N
-57,PD2,PD,bidirectional,LCD0-D4 / DSI-D1P
-58,PD3,PD,bidirectional,LCD0-D5 / DSI-D1N
-59,PD4,PD,bidirectional,LCD0-D6 / DSI-CKP
-60,PD5,PD,bidirectional,LCD0-D7 / DSI-CKN
-61,PD6,PD,bidirectional,LCD0-D10 / DSI-D2P
-62,PD7,PD,bidirectional,LCD0-D11 / DSI-D2N
-63,PD8,PD,bidirectional,LCD0-D12 / DSI-D3P
-64,PD9,PD,bidirectional,LCD0-D13 / DSI-D3N
-65,VCC-LVDS,PWR,power_in,1.8V — 推定為 MIPI D-PHY 電源
-66,VCC-PD,PWR,power_in,1.8/3.3V 可選 → 本板 3.3V
-67,PD10,PD,bidirectional,LCD0-D14 / SPI1-CS
-68,PD11,PD,bidirectional,LCD0-D15 / SPI1-CLK
-69,PD13,PD,bidirectional,★ 非連號:69=PD13
-70,PD12,PD,bidirectional,★ 非連號:70=PD12
-71,PD14,PD,bidirectional,LCD0-D20
-72,PD15,PD,bidirectional,LCD0-D21
-73,PD16,PD,bidirectional,LCD0-D22
-74,PD17,PD,bidirectional,LCD0-D23
-75,PD18,PD,bidirectional,LCD0-CLK
-76,PD19,PD,bidirectional,LCD0-DE
-77,VCC-TVOUT,PWR,power_in,3.3V
-78,TVOUT0,AV,output,CVBS 輸出
-79,PB7,PB,bidirectional,
-80,PB6,PB,bidirectional,
-81,VDD-SYS2,PWR,power_in,0.9V
-82,PB5,PB,bidirectional,
-83,VCC-IO,PWR,power_in,3.3V — PB/PC/PF 共用
-84,PB4,PB,bidirectional,
-85,PB3,PB,bidirectional,
-86,PB2,PB,bidirectional,
-87,MICIN3P,AUD,input,類比
-88,MICIN3N,AUD,input,類比
-89,AVCC,PWR,power_in,1.8V 類比
-90,VRA2,PWR,power_out,內部參考電壓
-91,AGND,PWR,power_in,★ 128 腳裡唯一的地腳(類比地)
-92,VRA1,PWR,power_out,內部參考電壓
-93,FMINR,AUD,input,類比
-94,FMINL,AUD,input,類比
-95,LINEINR,AUD,input,類比
-96,LINEINL,AUD,input,類比
-97,HPVCC,PWR,power_in,1.8V 耳機
-98,HPOUTR,AUD,output,類比
-99,HPOUTL,AUD,output,類比
-100,HPOUTFB,AUD,input,耳機偽差動接地參考
-101,GPADC0,AV,input,
-102,TP-X1,AV,passive,電阻式觸控
-103,TP-X2,AV,passive,電阻式觸控
-104,TP-Y1,AV,passive,電阻式觸控
-105,TP-Y2,AV,passive,電阻式觸控
-106,NC0,SYS,no_connect,
-107,VCC-TVIN,PWR,power_in,1.8V
-108,TVIN0,AV,input,CVBS 輸入
-109,TVIN1,AV,input,CVBS 輸入
-110,TVIN-VRP,AV,passive,
-111,TVIN-VRN,AV,passive,
-112,USB1-DP,USB,bidirectional,★ USB1 是 DP 在前
-113,USB1-DM,USB,bidirectional,★ USB1 是 DM 在後
-114,USB0-DM,USB,bidirectional,★ USB0 是 DM 在前 — 與 USB1 相反
-115,USB0-DP,USB,bidirectional,★ USB0 是 DP 在後 — 與 USB1 相反
-116,VDD-CORE0,PWR,power_in,0.9V
-117,VDD-CORE1,PWR,power_in,0.9V
-118,PG1,PG,bidirectional,★ 非連號
-119,PG2,PG,bidirectional,★ 非連號
-120,PG0,PG,bidirectional,★ 非連號:120=PG0
-121,PG3,PG,bidirectional,
-122,PG5,PG,bidirectional,★ 非連號:122=PG5
-123,PG4,PG,bidirectional,★ 非連號:123=PG4
-124,PG12,PG,bidirectional,
-125,PG13,PG,bidirectional,
-126,PG14,PG,bidirectional,
-127,PG15,PG,bidirectional,
-128,VCC-PG,PWR,power_in,1.8/3.3V 可選 → 本板 3.3V
-129,EPAD,PWR,power_in,★ 這顆晶片唯一的數位地 — 必焊
+pin,name,bank,type,note,ds_type,reset,pull,drive_mA,supply,ds_group
+1,PG6,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+2,PG7,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+3,PG8,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+4,PG9,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+5,PG10,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+6,PG11,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+7,PF0,PF,bidirectional,SDC0-D1,I/O,Z,PU/PD,4,VCC-IO,GPIOF
+8,PF1,PF,bidirectional,SDC0-D0,I/O,Z,PU/PD,4,VCC-IO,GPIOF
+9,PF2,PF,bidirectional,SDC0-CLK,I/O,Z,PU/PD,4,VCC-IO,GPIOF
+10,PF3,PF,bidirectional,SDC0-CMD,I/O,Z,PU/PD,4,VCC-IO,GPIOF
+11,PF4,PF,bidirectional,SDC0-D3,I/O,Z,PU/PD,4,VCC-IO,GPIOF
+12,PF5,PF,bidirectional,SDC0-D2,I/O,Z,PU/PD,4,VCC-IO,GPIOF
+13,PF6,PF,bidirectional,,I/O,Z,PU/PD,4,VCC-IO,GPIOF
+14,PC7,PC,bidirectional,SPI0-HOLD,I/O,Z,PU/PD,4,VCC-IO,GPIOC
+15,PC6,PC,bidirectional,SPI0-WP,I/O,Z,PU/PD,4,VCC-IO,GPIOC
+16,PC5,PC,bidirectional,SPI0-MISO,I/O,PU,PU/PD,4,VCC-IO,GPIOC
+17,PC4,PC,bidirectional,SPI0-MOSI,I/O,PU,PU/PD,4,VCC-IO,GPIOC
+18,PC3,PC,bidirectional,SPI0-CS0,I/O,PU,PU/PD,4,VCC-IO,GPIOC
+19,PC2,PC,bidirectional,SPI0-CLK,I/O,Z,PU/PD,4,VCC-IO,GPIOC
+20,VCC-PLL,PWR,power_in,1.8V,P,NA,NA,NA,NA,RTC & PLL
+21,REFCLK-OUT,SYS,output,,AO,NA,NA,NA,VCC-PLL,DCXO
+22,DXOUT,SYS,output,24MHz 晶振,AO,NA,NA,NA,VCC-PLL,DCXO
+23,DXIN,SYS,input,24MHz 晶振,AI,NA,NA,NA,VCC-PLL,DCXO
+24,X32KOUT,SYS,output,32.768kHz 晶振,AO,NA,NA,NA,VCC-RTC,RTC & PLL
+25,X32KIN,SYS,input,32.768kHz 晶振,AI,NA,NA,NA,VCC-RTC,RTC & PLL
+26,VCC-RTC,PWR,power_in,1.8V,P,NA,NA,NA,NA,RTC & PLL
+27,RESET,SYS,input,低有效,"I, OD",NA,NA,NA,VCC-RTC,System
+28,LDOA-OUT,PWR,power_out,內建 LDOA 輸出 1.8V @260mA,P,NA,NA,NA,NA,Power
+29,LDO-IN,PWR,power_in,內建 LDO 輸入 3.3V,P,NA,NA,NA,NA,Power
+30,LDOB-OUT,PWR,power_out,內建 LDOB 輸出 1.35V 預設 @400mA,P,NA,NA,NA,NA,Power
+31,PE13,PE,bidirectional,,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+32,PE12,PE,bidirectional,,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+33,PE3,PE,bidirectional,RMII-TXCK,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+34,VCC-PE,PWR,power_in,1.8/2.8/3.3V 可選 → 本板 3.3V,P,NA,NA,NA,NA,GPIOE
+35,PE2,PE,bidirectional,RMII-RXD1,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+36,PE11,PE,bidirectional,,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+37,PE10,PE,bidirectional,EPHY-25M,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+38,PE9,PE,bidirectional,MDIO,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+39,PE8,PE,bidirectional,MDC,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+40,PE7,PE,bidirectional,RMII-RXER,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+41,PE6,PE,bidirectional,RMII-TXEN,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+42,PE5,PE,bidirectional,RMII-TXD1,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+43,PE4,PE,bidirectional,RMII-TXD0,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+44,PE0,PE,bidirectional,RMII-CRS-DV,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+45,PE1,PE,bidirectional,RMII-RXD0,I/O,Z,PU/PD,4,VCC-PE,GPIOE
+46,VDD-SYS0,PWR,power_in,0.9V,P,NA,NA,NA,NA,Power
+47,DZQ,DDR,passive,DDR ZQ 校準,AI,NA,NA,NA,NA,SDRAM
+48,VCC-DRAM0,DDR,power_in,1.5V,P,NA,NA,NA,NA,SDRAM
+49,VCC-DRAM1,DDR,power_in,1.5V,P,NA,NA,NA,NA,SDRAM
+50,VDD18-DRAM,DDR,power_in,1.8V,P,NA,NA,NA,NA,SDRAM
+51,VDD-SYS1,PWR,power_in,0.9V,P,NA,NA,NA,NA,Power
+52,PD22,PD,bidirectional,,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+53,PD21,PD,bidirectional,LCD0-VSYNC,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+54,PD20,PD,bidirectional,LCD0-HSYNC,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+55,PD0,PD,bidirectional,LCD0-D2 / DSI-D0P,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+56,PD1,PD,bidirectional,LCD0-D3 / DSI-D0N,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+57,PD2,PD,bidirectional,LCD0-D4 / DSI-D1P,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+58,PD3,PD,bidirectional,LCD0-D5 / DSI-D1N,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+59,PD4,PD,bidirectional,LCD0-D6 / DSI-CKP,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+60,PD5,PD,bidirectional,LCD0-D7 / DSI-CKN,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+61,PD6,PD,bidirectional,LCD0-D10 / DSI-D2P,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+62,PD7,PD,bidirectional,LCD0-D11 / DSI-D2N,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+63,PD8,PD,bidirectional,LCD0-D12 / DSI-D3P,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+64,PD9,PD,bidirectional,LCD0-D13 / DSI-D3N,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+65,VCC-LVDS,PWR,power_in,1.8V — 推定為 MIPI D-PHY 電源,P,NA,NA,NA,NA,GPIOD
+66,VCC-PD,PWR,power_in,1.8/3.3V 可選 → 本板 3.3V,P,NA,NA,NA,NA,GPIOD
+67,PD10,PD,bidirectional,LCD0-D14 / SPI1-CS,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+68,PD11,PD,bidirectional,LCD0-D15 / SPI1-CLK,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+69,PD13,PD,bidirectional,★ 非連號:69=PD13,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+70,PD12,PD,bidirectional,★ 非連號:70=PD12,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+71,PD14,PD,bidirectional,LCD0-D20,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+72,PD15,PD,bidirectional,LCD0-D21,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+73,PD16,PD,bidirectional,LCD0-D22,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+74,PD17,PD,bidirectional,LCD0-D23,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+75,PD18,PD,bidirectional,LCD0-CLK,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+76,PD19,PD,bidirectional,LCD0-DE,I/O,Z,PU/PD,4,VCC-PD,GPIOD
+77,VCC-TVOUT,PWR,power_in,3.3V,P,NA,NA,NA,NA,CVBS OUT
+78,TVOUT0,AV,output,CVBS 輸出,AO,NA,NA,NA,VCC-TVOUT,CVBS OUT
+79,PB7,PB,bidirectional,,I/O,Z,PU/PD,4,VCC-IO,GPIOB
+80,PB6,PB,bidirectional,,I/O,Z,PU/PD,4,VCC-IO,GPIOB
+81,VDD-SYS2,PWR,power_in,0.9V,P,NA,NA,NA,NA,Power
+82,PB5,PB,bidirectional,,I/O,Z,PU/PD,4,VCC-IO,GPIOB
+83,VCC-IO,PWR,power_in,3.3V — PB/PC/PF 共用,P,NA,NA,NA,NA,Power
+84,PB4,PB,bidirectional,,I/O,Z,PU/PD,4,VCC-IO,GPIOB
+85,PB3,PB,bidirectional,,I/O,Z,PU/PD,4,VCC-IO,GPIOB
+86,PB2,PB,bidirectional,,I/O,Z,PU/PD,4,VCC-IO,GPIOB
+87,MICIN3P,AUD,input,類比,AI,NA,NA,NA,AVCC,Audio Codec
+88,MICIN3N,AUD,input,類比,AI,NA,NA,NA,AVCC,Audio Codec
+89,AVCC,PWR,power_in,1.8V 類比,P,NA,NA,NA,NA,Audio Codec
+90,VRA2,PWR,power_out,內部參考電壓,AO,NA,NA,NA,AVCC,Audio Codec
+91,AGND,PWR,power_in,★ 128 腳裡唯一的地腳(類比地),G,NA,NA,NA,NA,Audio Codec
+92,VRA1,PWR,power_out,內部參考電壓,AO,NA,NA,NA,AVCC,Audio Codec
+93,FMINR,AUD,input,類比,AI,NA,NA,NA,AVCC,Audio Codec
+94,FMINL,AUD,input,類比,AI,NA,NA,NA,AVCC,Audio Codec
+95,LINEINR,AUD,input,類比,AI,NA,NA,NA,AVCC,Audio Codec
+96,LINEINL,AUD,input,類比,AI,NA,NA,NA,AVCC,Audio Codec
+97,HPVCC,PWR,power_in,1.8V 耳機,P,NA,NA,NA,NA,Audio Codec
+98,HPOUTR,AUD,output,類比,AO,NA,NA,NA,HPVCC,Audio Codec
+99,HPOUTL,AUD,output,類比,AO,NA,NA,NA,HPVCC,Audio Codec
+100,HPOUTFB,AUD,input,耳機偽差動接地參考,AI,NA,NA,NA,HPVCC,Audio Codec
+101,GPADC0,AV,input,,AI,NA,NA,NA,AVCC,GPADC
+102,TP-X1,AV,passive,電阻式觸控,AI,NA,NA,NA,AVCC,TPADC
+103,TP-X2,AV,passive,電阻式觸控,AI,NA,NA,NA,AVCC,TPADC
+104,TP-Y1,AV,passive,電阻式觸控,AI,NA,NA,NA,AVCC,TPADC
+105,TP-Y2,AV,passive,電阻式觸控,AI,NA,NA,NA,AVCC,TPADC
+106,NC0,SYS,no_connect,,NA,NA,NA,NA,NA,NC
+107,VCC-TVIN,PWR,power_in,1.8V,P,NA,NA,NA,NA,CVBS IN
+108,TVIN0,AV,input,CVBS 輸入,AI,NA,NA,NA,VCC-TVIN,CVBS IN
+109,TVIN1,AV,input,CVBS 輸入,AI,NA,NA,NA,VCC-TVIN,CVBS IN
+110,TVIN-VRP,AV,passive,,P,NA,NA,NA,VCC-TVIN,CVBS IN
+111,TVIN-VRN,AV,passive,,P,NA,NA,NA,VCC-TVIN,CVBS IN
+112,USB1-DP,USB,bidirectional,★ USB1 是 DP 在前,A I/O,NA,NA,NA,VCC-IO,USB
+113,USB1-DM,USB,bidirectional,★ USB1 是 DM 在後,A I/O,NA,NA,NA,VCC-IO,USB
+114,USB0-DM,USB,bidirectional,★ USB0 是 DM 在前 — 與 USB1 相反,A I/O,NA,NA,NA,VCC-IO,USB
+115,USB0-DP,USB,bidirectional,★ USB0 是 DP 在後 — 與 USB1 相反,A I/O,NA,NA,NA,VCC-IO,USB
+116,VDD-CORE0,PWR,power_in,0.9V,P,NA,NA,NA,NA,Power
+117,VDD-CORE1,PWR,power_in,0.9V,P,NA,NA,NA,NA,Power
+118,PG1,PG,bidirectional,★ 非連號,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+119,PG2,PG,bidirectional,★ 非連號,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+120,PG0,PG,bidirectional,★ 非連號:120=PG0,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+121,PG3,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+122,PG5,PG,bidirectional,★ 非連號:122=PG5,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+123,PG4,PG,bidirectional,★ 非連號:123=PG4,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+124,PG12,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+125,PG13,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+126,PG14,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+127,PG15,PG,bidirectional,,I/O,Z,PU/PD,4,VCC-PG,GPIOG
+128,VCC-PG,PWR,power_in,1.8/3.3V 可選 → 本板 3.3V,P,NA,NA,NA,NA,GPIOG
+129,EPAD,PWR,power_in,★ 這顆晶片唯一的數位地 — 必焊,,,,,,
