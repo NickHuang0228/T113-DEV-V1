@@ -55,13 +55,26 @@ python hardware/scripts/check_schematic.py
 
 ## 符號
 
-**單一真實來源是 `data/T113-S3_pinmap.csv`。**
+**單一真實來源是 `data/T113-S3_pinmap.csv`**（129 列 = 128 腳 + EPAD）。
 
 ```bash
-python hardware/scripts/gen_t113_symbol.py
+python hardware/scripts/gen_t113_symbol.py    # 生成符號（生成前先驗表）
+python hardware/scripts/extract_pins.py       # 回 datasheet 重抽 Table 4-2 對帳
 ```
 
 改腳位一律改 CSV 再重跑，**不要手改 `.kicad_sym`**。
+
+CSV 有兩種欄位，改的時候要知道自己在改哪一種：
+
+```
+datasheet 欄位   name · ds_type · reset · pull · drive_mA · supply · group
+                 機器從 Table 4-2 抽的,不要手改 —— 要改用 extract_pins.py --write 重抽
+設計欄位         bank · type · note
+                 人工判斷(KiCad 單元分組 · 電氣型別 · mux 註記),手改這些
+```
+
+`gen_t113_symbol.py` 生成前會驗人工欄位對不對得上 datasheet 欄位，
+`extract_pins.py` 則是回 PDF 重抽，驗 datasheet 欄位沒被改歪。
 理由與 128 腳的核對過程見 [../docs/design/010-symbol.md](../docs/design/010-symbol.md)。
 
 ---

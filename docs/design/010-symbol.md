@@ -1,6 +1,6 @@
 # 010 · T113-S3 符號建立
 
-版本：v0.2 · 2026-09-21（與另一條線的機器抽取表交叉驗證通過）
+版本：v0.3 · 2026-09-21（兩份腳位表已合併成單一來源）
 
 **單一真實來源是 `hardware/data/T113-S3_pinmap.csv`。**
 符號由 `hardware/scripts/gen_t113_symbol.py` 生成，**不手改 `.kicad_sym`**。
@@ -96,24 +96,47 @@ tools/           page.find_tables() 機器抽 Table 4-2（依繪製線框切格�
 > **規則升級：有線框的表格先用 `find_tables()`，沒線框的才退回看圖。**
 > 本文件 §2 的「只能用看的」只適用於 Figure 7-1 這種純向量圖。
 
-### 3.2 ⚠ 目前有兩份腳位表，還沒合併
+### 3.2 兩份腳位表已合併成單一來源
+
+原本有兩份：`tools/t113s3_pins.csv`（機器抽 Table 4-2）與
+`hardware/data/T113-S3_pinmap.csv`（目視抄 Figure 7-1）。
+**兩個真實來源是會長歪的**，所以合併成一份，`tools/` 整個移除。
+
+合併方式是「以機器抽取為底，疊上 KiCad 需要的欄位」——
+合併前先做三方對帳，本機重抽 Table 4-2 與兩份舊表**零差異**（128 腳 × 7 欄）。
+
+| 欄 | 來源 | 誰產生 |
+|---|---|---|
+| `pin` `name` | Table 4-2（並與 Figure 7-1 目視表一致） | 機器抽 |
+| `ds_type` | Table 4-2 Type 欄（`I/O` `P` `AI` `AO` …） | 機器抽 |
+| `reset` `pull` `drive_mA` | Table 4-2 | 機器抽 |
+| `supply` | Table 4-2 Power Supply 欄（**10 組電源域**） | 機器抽 |
+| `group` | Table 4-2 的分組標題 | 機器抽 |
+| `bank` | 符號單元分組（PB/PC/PD/…/PWR/SYS/USB/AUD/AV/DDR） | 人工 |
+| `type` | KiCad 電氣型別 | 人工 |
+| `note` | mux 衝突、非連號、電壓選項等設計註記 | 人工 |
+
+**單一來源之後，防線從「兩份表互比」換成兩道自動檢查：**
 
 ```
-tools/t113s3_pins.csv          機器抽 Table 4-2，欄位較豐富（reset/pull/drive_mA/supply/group）
-hardware/data/T113-S3_pinmap.csv   本文件用的，含 EPAD、KiCad 電氣型別、mux 註記
+python hardware/scripts/extract_pins.py       重抽 Table 4-2,逐格比對 datasheet 欄位
+  ✓ 128 腳 × 7 欄與 Table 4-2 完全一致
+  ✓ pin 129 EPAD 不在 Table 4-2 裡(來源是 §7.2 機構圖),已跳過
+
+python hardware/scripts/gen_t113_symbol.py    生成前先驗表內部一致
+  ✓ 腳位表自我檢查通過(129 列,含 EPAD)
+    · 型別:datasheet Type 與 KiCad 電氣型別逐腳相符
+    · 電源域:10 組,每組都有對應的電源腳
 ```
 
-**兩個真實來源是會長歪的。** 在合併成一份之前，
-`gen_t113_symbol.py` 每次生成都會自動比對兩份，不一致就中止：
+這比原本的兩份互比更強 —— **舊的只比對 `name` 一欄**，
+現在是人工欄位對得上 datasheet 欄位（標錯電氣型別會被擋下來），
+而且 datasheet 欄位隨時可以回 PDF 重抽重驗，不是「抽過一次就定案」。
 
-```
-✓ 與 tools/t113s3_pins.csv 交叉檢查一致（128 腳）
-```
+`extract_pins.py --write` 可重抽並覆寫 datasheet 欄位，**設計欄位不動**。
 
-```
-[ ] ★ 合併成單一來源：以 tools/ 的機器抽取為底，
-     疊上 KiCad 需要的欄位（電氣型別、單元分配、EPAD）
-```
+> ⚠ 合併後重跑 `gen_t113_symbol.py`，產出的 `.kicad_sym` 與合併前**逐位元組相同**。
+> 這次合併只動資料與檢查，沒動符號。
 
 ---
 

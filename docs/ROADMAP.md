@@ -191,6 +191,9 @@ MIPI 面板點亮             50~60%（軟體參數為主，可反覆調）
             128 腳逐腳目視核對 Figure 7-1，與 §4.1 Pin Quantity 五項分類全中
             ⚠ 四處非連號:PD12/13 對調 · PG 頂排亂序 · PE 底排亂序 · USB0/1 極性相反
             由 CSV 生成,不手改 .kicad_sym;已回讀驗證
+        [x] 腳位表合併成單一來源 hardware/data/T113-S3_pinmap.csv
+            機器抽的 7 欄(ds_type/reset/pull/drive_mA/supply/group)+ 人工 3 欄(bank/type/note)
+            兩道自動檢查:extract_pins.py 回 PDF 重抽對帳 · gen_t113_symbol.py 驗表內部一致
         [x] 電源樹數值定案 —— 見 011-power-tree.md
             分壓 232K/76.8K/25.5K(R_bot 51K),EN1 用 47K+220nF(T1=4.67ms)
             RESET 用 APX803-29SAG-7(200ms) 上拉到 +1V8_SOC

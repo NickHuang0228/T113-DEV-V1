@@ -171,7 +171,7 @@ VCC-PD 因 MIPI 而選 1.8V  →  PD bank 上所有腳都是 1.8V
 
 ### 5.1 ⚠ PB0 / PB1 在 eLQFP128 上不存在
 
-從 `tools/t113s3_pins.csv`（Table 4-2 實抽）確認：
+從 `hardware/data/T113-S3_pinmap.csv`（Table 4-2 實抽欄位）確認：
 
 ```
 GPIOB 只有 6 支   79:PB7  80:PB6  82:PB5  84:PB4  85:PB3  86:PB2

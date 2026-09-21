@@ -2,8 +2,12 @@
 """從 T113-S3_pinmap.csv 產生 KiCad 符號。
 
 單一真實來源是 CSV —— 符號一律由此生成，不手改 .kicad_sym。
-CSV 的數字來自 datasheet Figure 7-1 Pin Map (p.77) 逐腳目視核對，
-並與 §4.1 Pin Quantity (p.23) 的五項分類交叉驗證通過。
+CSV 的 datasheet 欄位由 extract_pins.py 從 Table 4-2 機器抽出（可隨時重抽對帳），
+設計欄位（bank / type / note）是人工判斷，來自 Figure 7-1 Pin Map (p.77) 逐腳目視
+核對，並與 §4.1 Pin Quantity (p.23) 的五項分類交叉驗證通過。
+
+兩種欄位的一致性在 self_check() 裡驗 —— 人工標的電氣型別必須對得上
+datasheet 的 Type 欄，標錯會被擋下來。
 
 用法：python hardware/scripts/gen_t113_symbol.py
 """
@@ -19,11 +23,27 @@ if hasattr(sys.stdout, "reconfigure"):
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CSV = os.path.join(ROOT, "data", "T113-S3_pinmap.csv")
-# 另一份獨立來源：tools/extract_pins.py 從 Table 4-2 機器抽出的表。
-# 兩份是不同方法得到的（目視抄 Figure 7-1 vs find_tables 抽 Table 4-2），
-# 互為驗證。只要還沒合併成一份，就每次生成時比對一次，防止偷偷長歪。
-CROSS_CSV = os.path.join(os.path.dirname(os.path.dirname(ROOT)), "T113-DEV-V1", "tools", "t113s3_pins.csv")
 OUT = os.path.join(ROOT, "symbols", "T113-DEV-V1.kicad_sym")
+
+# datasheet Table 4-2 的 Type 欄 → 允許的 KiCad 電氣型別。
+#   P/AI/AO 一對多是有理由的：P 涵蓋電源輸入、內建 LDO 輸出與參考電壓腳，
+#   AI/AO 涵蓋類比輸入與外掛被動元件的腳。一對一收得太緊會誤殺。
+#   真正要擋的是把訊號腳標成電源腳（rules_t113.py 會據此去驗電源軌）。
+TYPE_OK = {
+    "I/O":   {"bidirectional"},
+    "A I/O": {"bidirectional"},
+    "I":     {"input"},
+    "I, OD": {"input"},
+    "O":     {"output"},
+    "AI":    {"input", "passive"},
+    "AO":    {"output", "power_out"},
+    "G":     {"power_in"},
+    "P":     {"power_in", "power_out", "passive"},
+    "NA":    {"no_connect"},
+    "":      {"power_in"},          # EPAD：不在 Table 4-2 裡
+}
+
+EPAD_PIN = "129"
 
 PITCH = 2.54
 PIN_LEN = 5.08
@@ -94,27 +114,58 @@ def build_unit(idx, title, rows):
     return "\n".join(body), title
 
 
-def cross_check(rows):
-    """與 tools/t113s3_pins.csv 比對。兩份來源不同方法，不該有差異。"""
-    if not os.path.exists(CROSS_CSV):
-        print("  ⚠ 找不到 tools/t113s3_pins.csv，跳過交叉檢查")
-        return
-    other = {r["pin"]: r["name"].strip()
-             for r in csv.DictReader(io.open(CROSS_CSV, encoding="utf-8"))}
-    mine = {r["pin"]: r["name"].strip() for r in rows}
-    bad = [(p, other.get(p), mine.get(p))
-           for p in sorted(set(other) | set(mine), key=int)
-           if other.get(p) != mine.get(p) and p != "129"]   # 129=EPAD 只有本表有
+def self_check(rows):
+    """CSV 自我一致性檢查。
+
+    合併成單一來源之後，防線從「兩份表互比」換成兩道：
+      ① 這裡 —— 驗表內部一致（腳號完整、人工欄位對得上 datasheet 欄位）
+      ② extract_pins.py —— 重抽 Table 4-2，驗 datasheet 欄位沒被改歪
+    """
+    bad = []
+
+    pins = [r["pin"] for r in rows]
+    nums = sorted(int(p) for p in pins)
+    gaps = sorted(set(range(1, 129)) - set(nums))
+    dup = sorted({p for p in nums if nums.count(p) > 1})
+    if gaps:
+        bad.append(f"缺腳號：{gaps}")
+    if dup:
+        bad.append(f"重複腳號：{dup}")
+    if EPAD_PIN not in pins:
+        bad.append(f"缺 pin {EPAD_PIN} EPAD —— 它是唯一的數位地，不在 Table 4-2 裡")
+
+    for r in rows:
+        ds, kt = r["ds_type"], r["type"]
+        if ds not in TYPE_OK:
+            bad.append(f"pin {r['pin']} {r['name']}：未知的 datasheet Type {ds!r}")
+        elif kt not in TYPE_OK[ds]:
+            bad.append(f"pin {r['pin']} {r['name']}：datasheet Type={ds!r} "
+                       f"但標成 KiCad {kt!r}（允許 {sorted(TYPE_OK[ds])}）")
+        if not r["bank"]:
+            bad.append(f"pin {r['pin']} {r['name']}：bank 空白")
+
+    # 每支 I/O 腳的電源域，都要在表裡找得到同名的電源腳
+    names = {r["name"] for r in rows}
+    for r in rows:
+        sup = r["supply"]
+        if sup and sup != "NA" and sup not in names:
+            bad.append(f"pin {r['pin']} {r['name']}：電源域 {sup} 在表裡沒有對應的電源腳")
+
     if bad:
-        for p, o, m in bad:
-            print(f"  ✗ pin {p}: tools/={o}  data/={m}")
-        sys.exit("兩份腳位表不一致 —— 先查清楚哪一份錯了，不要直接生成")
-    print(f"  ✓ 與 tools/t113s3_pins.csv 交叉檢查一致（{len(other)} 腳）")
+        for b in bad:
+            print(f"  ✗ {b}")
+        sys.exit("腳位表自我檢查未過 —— 先修 CSV，不要直接生成")
+
+    print(f"  ✓ 腳位表自我檢查通過（{len(rows)} 列，含 EPAD）")
+    print(f"    · 型別：datasheet Type 與 KiCad 電氣型別逐腳相符")
+    print(f"    · 電源域：{len({r['supply'] for r in rows if r['supply'] not in ('', 'NA')})} 組，"
+          f"每組都有對應的電源腳")
+    print(f"    · datasheet 欄位是否仍與 Table 4-2 相符 → python hardware/scripts/extract_pins.py")
 
 
 def main():
     rows = list(csv.DictReader(io.open(CSV, encoding="utf-8")))
-    cross_check(rows)
+    self_check(rows)
     assigned = set()
     units = []
     for title, pred in UNITS:

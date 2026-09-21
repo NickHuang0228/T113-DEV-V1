@@ -90,7 +90,24 @@ def load_t113_pins():
     rows = list(csv.DictReader(io.open(PINMAP_CSV, encoding="utf-8")))
     by_name = {r["name"]: r["pin"] for r in rows}
     by_pin = {r["pin"]: r["name"] for r in rows}
-    return by_name, by_pin
+    return by_name, by_pin, rows
+
+
+def check_power_domains(rows):
+    """datasheet 的 Power Supply 欄列到的每一組電源域，上面都要有指定的軌。
+
+    出處：ROADMAP §3.2 風險⑦「周邊 IC 的隱藏電源軌」——
+    同一個坑在 SoC 身上就是「漏掉一組 VCC-Px」。合併成單一來源之後，
+    supply 欄是機器從 Table 4-2 抽的，這條就能自動驗，不靠記憶。
+    """
+    out = []
+    domains = sorted({r["supply"] for r in rows if r["supply"] not in ("", "NA")})
+    missing = [d for d in domains if d not in T113_POWER_NETS]
+    if missing:
+        out.append(("ERR", "電源域未定義",
+                    f"Table 4-2 的 Power Supply 欄有 {', '.join(missing)}，"
+                    f"但 T113_POWER_NETS 沒指定該接哪條軌　〔011-power-tree.md §1〕"))
+    return out
 
 
 def find_refs(comps, pattern):
@@ -101,7 +118,8 @@ def find_refs(comps, pattern):
 def run(comps, nets, pinmap, norm):
     """回傳 [(級別, 規則名, 訊息), ...]"""
     out = []
-    by_name, by_pin = load_t113_pins()
+    by_name, by_pin, pin_rows = load_t113_pins()
+    out += check_power_domains(pin_rows)
 
     t113 = find_refs(comps, r"^T113-S3$")
     adv = find_refs(comps, r"ADV7511")

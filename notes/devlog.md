@@ -1597,3 +1597,103 @@ hardware/data/T113-S3_pinmap.csv   我的,含 EPAD、KiCad 電氣型別、mux �
 ```
 
 **明天第一件事:合併成單一來源**,以機器抽取為底,疊上 KiCad 需要的欄位。
+
+---
+
+## 2026-09-21 · 合併腳位表:把「兩份互比」換成「一份 + 兩道回源檢查」
+
+昨天結尾寫「明天第一件事:合併成單一來源」。做完了,而且合併的過程本身
+就是一次驗證 —— 我沒有直接把兩份表湊起來,而是**回 PDF 重抽一次**。
+
+### 三方對帳:零差異
+
+```
+① 本機重抽 Table 4-2          vs  tools/t113s3_pins.csv(另一台機器抽的)
+   → 128 腳 × 7 欄,差異 0 格
+
+② 本機重抽 Table 4-2          vs  hardware/data(目視抄 Figure 7-1)的 name 欄
+   → 128 腳,差異 0 腳
+```
+
+第①條是在驗「抽取方法在不同機器上可重現」,第②條是在驗「機器抽的跟目視抄的一致」。
+兩條都過,合併才有意義 —— 不然只是把兩份可能都錯的東西黏在一起。
+
+### 合併結果
+
+單一來源是 `hardware/data/T113-S3_pinmap.csv`,129 列(128 腳 + EPAD),11 欄。
+`tools/` 整個移除。
+
+```
+datasheet 欄位  name · ds_type · reset · pull · drive_mA · supply · group
+                機器從 Table 4-2 抽,隨時可回 PDF 重抽重驗
+設計欄位        bank · type · note
+                人工判斷:KiCad 單元分組 · 電氣型別 · mux 註記
+```
+
+**關鍵是這兩種欄位要分清楚。** 混在一起的話,「重抽」就會蓋掉人工判斷,
+於是沒人敢重抽,於是那份表就變成「抽過一次就定案」—— 跟手動維護沒兩樣。
+所以 `extract_pins.py --write` 只覆寫 datasheet 欄位,設計欄位一格都不碰。
+
+### 防線其實變強了,不是變弱
+
+我原本有點怕:少了一份表,交叉檢查不就沒了?實際上相反。
+
+```
+舊的  gen_t113_symbol.py 比對兩份 CSV
+      只比 name 一欄 —— 兩份表的其他欄位根本對不起來,沒得比
+
+新的  extract_pins.py       回 PDF 重抽,比 7 欄 × 128 腳
+      gen_t113_symbol.py    驗表內部一致(人工欄位 vs datasheet 欄位)
+```
+
+舊的那條**比的是兩份衍生檔**,新的**比的是原始文件**。而且多了一種全新的檢查 ——
+人工標的 KiCad 電氣型別,要對得上 datasheet 的 Type 欄:
+
+```
+I/O   → bidirectional
+P     → power_in / power_out / passive
+AI    → input / passive
+G     → power_in
+NA    → no_connect
+```
+
+一對多的幾個是有理由的(P 涵蓋電源輸入、內建 LDO 輸出、參考電壓腳),
+收得太緊會誤殺。**真正要擋的是把訊號腳標成電源腳** ——
+因為 `rules_t113.py` 會拿電源腳去驗電源軌,標錯就是整條檢查鏈失效。
+
+### 順手補了一條規則:電源域必須全部有軌
+
+合併之後 `supply` 欄進到主表,這件事就能自動驗了:
+
+```
+Table 4-2 的 Power Supply 欄有 10 組電源域
+  AVCC · HPVCC · VCC-IO · VCC-PD · VCC-PE · VCC-PG
+  VCC-PLL · VCC-RTC · VCC-TVIN · VCC-TVOUT
+每一組都要在 T113_POWER_NETS 裡指定接哪條軌,漏一組就噴 ERR
+```
+
+這就是 ROADMAP §3.2 風險⑦「周邊 IC 的隱藏電源軌」同一個坑,
+只是發生在 SoC 身上叫「漏掉一組 VCC-Px」。
+**那一條當初是靠人逐頁看 Power/Ground Pins 才補上的,現在機器會看。**
+
+### 一個讓我安心的結果
+
+合併後重跑 `gen_t113_symbol.py`,產出的 `.kicad_sym` 與合併前**逐位元組相同**。
+
+這代表這次動的全是資料組織與檢查,符號本身一根腳都沒變。
+如果 diff 不是空的,那就表示合併過程中改到了不該改的東西。
+**「重構後產物不變」是重構有沒有做對的最直接證據。**
+
+### 下一步
+
+```
+階段 1  原理圖
+  [x] T113-S3 符號
+  [x] 電源樹數值定案(011-power-tree.md)
+  [x] 腳位表合併成單一來源
+  [ ] ★ 電源頁 —— Nick 畫,照 011 §1~§6 的數值
+  [ ] 各介面電路
+  [ ] ERC 歸零
+```
+
+開 `hardware/T113-DEV-V1.kicad_pro`,畫一段跑一次 `check_schematic.py`。
