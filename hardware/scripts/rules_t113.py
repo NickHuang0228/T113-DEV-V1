@@ -24,8 +24,9 @@ T113_POWER_NETS = {
     "VCC-RTC": "+1V8_SOC",
     "VCC-LVDS": "+1V8_SOC",
     "VCC-TVIN": "+1V8_SOC",
-    "AVCC": "+1V8_SOC",
-    "HPVCC": "+1V8_SOC",
+    "AVCC": "+1V8_AUDIO",       # ±1%，AP2112K 做不到 → 內建 LDOA 供（§3.1）
+    "HPVCC": "+1V8_AUDIO",
+    "LDOA-OUT": "+1V8_AUDIO",
     "VDD18-DRAM": "+1V8_SOC",
     "VCC-DRAM0": "+1V5",
     "VCC-DRAM1": "+1V5",
@@ -41,7 +42,6 @@ T113_POWER_NETS = {
 # 這幾支是輸出/不接軌，接到電源軌反而是錯的
 #    出處：011-power-tree.md §3.1
 T113_MUST_NOT_BE_RAIL = {
-    "LDOA-OUT": "內建 LDOA 輸出 —— 本板不使用，只掛 2.2µF。接到 +1V8_SOC 等於兩顆穩壓器並聯",
     "LDOB-OUT": "內建 LDOB 輸出 —— 本板不使用，只掛 2.2µF",
     "VRA1": "內部參考電壓輸出，不可接電源軌",
     "VRA2": "內部參考電壓輸出，不可接電源軌",
@@ -149,7 +149,7 @@ def run(comps, nets, pinmap, norm):
         for sig, why in T113_MUST_NOT_BE_RAIL.items():
             pin = by_name.get(sig)
             got = pinmap.get((ref, pin)) if pin else None
-            if got and norm(got) in ("+1V8_SOC", "+1V8_HDMI", "+3V3", "+1V5", "+0V9"):
+            if got and norm(got) in ("+1V8_SOC", "+1V8_AUDIO", "+1V8_HDMI", "+3V3", "+1V5", "+0V9"):
                 out.append(("ERR", "不該接電源軌",
                             f"{ref} pin {pin} ({sig}) 接到 {norm(got)} —— {why}"))
 

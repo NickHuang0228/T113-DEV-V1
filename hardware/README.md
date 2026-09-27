@@ -101,7 +101,8 @@ USB0 與 USB1 的 DP/DM 順序相反
 +5V_USB    經 TPS2051B 限流後給 USB-A Host
 +5V_HDMI   HDMI 座上的 +5V（DDC 上拉用，接外部螢幕）
 +3V3
-+1V8_SOC   SoC 側 1.8V
++1V8_SOC   SoC 側 1.8V（外部 LDO1）
++1V8_AUDIO T113 內建 LDOA 輸出，只給 AVCC / HPVCC（不可與 +1V8_SOC 相連）
 +1V8_HDMI  ADV7511 專屬 1.8V（LC 之前）
 +1V8_DVDD  ADV7511 DVDD 組（LC 之後）
 +1V8_AVDD  ADV7511 AVDD+PVDD 組（LC 之後）
