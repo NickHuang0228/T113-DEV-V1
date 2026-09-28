@@ -11,6 +11,11 @@
 | 第 1 塊 | ESP32S3-DEV-V1 | KiCad 全流程、4 層疊構、USB FS、出圖下單、bring-up | **完成** |
 | **第 2 塊** | **T113-DEV-V1**（本專案） | **Linux bring up、多電壓域、13 對差分、阻抗控制、RGB 並列** | 規劃中 |
 | 第 3 塊 | 高速差分轉接／探測板 | DP 8.1Gbps、Type-C mux、測試點不破壞阻抗 | 構想 |
+| 第 4 塊 | RK3568 板 | **MIPI CSI-2**、外接 DDR4、BGA 扇出 | 構想 |
+
+> **CSI 不在 T113 這塊做**：T113-S3 沒有 MIPI CSI，只有 8-bit Parallel CSI（DVP），
+> 而且和乙太網路 RMII 共用 PE0~PE9，只能二選一 —— 選了乙太網路（理由見 SPEC §8）。
+> CSI 延到 RK3568 那塊，直接學 MIPI CSI-2 差分，比 DVP 並列更有價值。
 
 ---
 

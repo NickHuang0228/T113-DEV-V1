@@ -36,3 +36,6 @@ desktop.ini
 # KiCad 執行期檔案
 hardware/*.kicad_prl
 hardware/fp-info-cache
+
+# KiCad 10 本地歷史（自帶 git repo，不進版控）
+.history/

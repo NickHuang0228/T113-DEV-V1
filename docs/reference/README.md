@@ -11,6 +11,8 @@
 | `peripherals/ADV7511_Hardware_Users_Guide.pdf` | 58 | **HDMI 橋接主文件**（Rev D, 2011-07）—— 電氣規格 §4、腳位表 §5、Layout §7 | [analog.com](https://www.analog.com/media/en/technical-documentation/user-guides/ADV7511_Hardware_Users_Guide.pdf) |
 | `peripherals/RTL8201F-VB-CG_datasheet_v1.4.pdf` | 67 | 乙太 PHY | Realtek |
 | `peripherals/CH340DS1_datasheet.pdf` | — | USB-UART | WCH |
+| `peripherals/APX803_datasheet.pdf` | 11 | RESET supervisor（DS32131 Rev.3-3）⚠ 標註 NRND，建議改 APX803S | [diodes.com](https://www.diodes.com/datasheet/download/APX803.pdf) |
+| `peripherals/TPS2051B_datasheet.pdf` | — | USB 限流開關（SLVS514P, 2024-08） | [ti.com](https://www.ti.com/lit/ds/symlink/tps2051b.pdf) |
 | `peripherals/IT66121FN_datasheet_v1.02.pdf` | 40 | ⚠ **已停產，設計已改用 ADV7511**；保留作對照 | ITE |
 
 ⚠ **ADV7511 的 PDF 無法自動下載。** ADI 封鎖 curl / PowerShell / WebFetch

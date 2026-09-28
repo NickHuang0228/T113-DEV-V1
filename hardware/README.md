@@ -2,7 +2,8 @@
 
 ```
 T113-DEV-V1.kicad_pro      專案
-T113-DEV-V1.kicad_sch      根圖紙
+T113-DEV-V1.kicad_sch      根圖紙（階層式，各頁掛在這裡）
+power.kicad_sch            p.2 電源
 symbols/                   自建符號（由腳本生成，勿手改）
 footprints/                自建 footprint
 data/                      腳位表等來源資料 ★ 單一真實來源
@@ -76,6 +77,23 @@ datasheet 欄位   name · ds_type · reset · pull · drive_mA · supply · gro
 `gen_t113_symbol.py` 生成前會驗人工欄位對不對得上 datasheet 欄位，
 `extract_pins.py` 則是回 PDF 重抽，驗 datasheet 欄位沒被改歪。
 理由與 128 腳的核對過程見 [../docs/design/010-symbol.md](../docs/design/010-symbol.md)。
+
+---
+
+### 電源頁的小顆 IC
+
+```bash
+python hardware/scripts/gen_power_symbols.py   # → symbols/T113-DEV-V1-power.kicad_sym
+```
+
+| 符號 | 為什麼自建 |
+|---|---|
+| `RY1303` | 內建庫沒有 |
+| `APX803-29SA` | 內建庫沒有；⚠ SOT23 有 **SA / SR 兩種腳位**，料號 `-29SAG-7` 是 SA（1=GND 2=RESET# 3=VCC） |
+| `TPS2051B` | 內建只有 TPS2051C（腳位同，料號不同）；EN **高有效**（TPS2041B 才是低有效） |
+
+AP2112K-1.8 用內建 `Regulator_Linear:AP2112K-1.8`。
+⚠ RY1303 的 Footprint 欄刻意留空 —— datasheet 封裝圖是圖片，pitch / EP 尺寸還沒核對。
 
 ---
 

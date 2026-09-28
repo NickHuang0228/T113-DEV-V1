@@ -1,5 +1,5 @@
 (kicad_sch
-	(version 20250114)
+	(version 20260306)
 	(generator "eeschema")
 	(generator_version "10.0")
 	(uuid "00000000-0000-0000-0000-000000000001")
@@ -10,7 +10,56 @@
 		(comment 1 "根目錄圖紙 —— 各介面分頁掛在這裡")
 	)
 	(lib_symbols)
-	(sheet_instances
-		(path "/" (page "1"))
+	(sheet
+		(at 33.02 39.37)
+		(size 93.98 54.61)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "04570e9e-060d-4156-8a20-e24c8ec7616f")
+		(property "Sheetname" "電源"
+			(at 33.02 38.6584 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "power.kicad_sch"
+			(at 33.02 94.5646 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "T113-DEV-V1"
+				(path "/00000000-0000-0000-0000-000000000001"
+					(page "2")
+				)
+			)
+		)
 	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
 )
