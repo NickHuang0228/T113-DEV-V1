@@ -516,4 +516,13 @@ TPS2051BDBVR   LCSC C24593 ($0.21, 庫存 38,715)
 [x] Table 5-2 / 5-3 原頁目視核對 —— 數字無誤；抓到 AVCC ±1% → 改由 LDOA 供（§3.1）
 [ ] +1V5 電感庫存只有 2,895 —— 下單前再查一次，不足就走 §2.4 備案
 [ ] bring-up 量三軌實際電流，回填 §2.5
+[ ] ★ 電感 footprint 對帳 —— 現用 KiCad 內建 L_Changjiang_FNR4020S，
+    但 BOM 選的是 FHD4020S（同廠不同系列）。兩者外形都是 4×4×2.0，
+    但焊盤尺寸未必相同 → 開 .kicad_mod 看 pad，對照 FHD4020S datasheet
+    的推薦焊盤圖；不合就複製一份改，放 hardware/footprints/T113-DEV-V1.pretty
+    （與 T113 EPAD 同一套流程：標準件先找，對不上才自建）
+[ ] power.kicad_sch 還有一顆 power:+3.3V 未換成 +3V3（§1.1 命名規定）
+    ⚠ 這種漏一顆最危險 —— ERC 只會提示「net 只有一個連接點」，容易被忽略
+[ ] 被動件 footprint 統一 0603（006-assembly.md 的手焊決定）
+    Capacitor_SMD:C_0603_1608Metric / Resistor_SMD:R_0603_1608Metric
 ```
