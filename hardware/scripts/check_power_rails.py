@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""從 netlist 驗證 RY1303 三路 buck 的接線與分壓值。
+"""從 netlist 驗證電源頁：RY1303 三路 buck、兩顆 AP2112K LDO、被動件 footprint。
 
 為什麼需要這支：原理圖階段最危險的錯誤是「值對、結構對、電源符號對，
 只有回授那條線接到長得很像的另一支腳」—— 眼睛掃不出來，只有 netlist 看得見。
@@ -11,7 +11,7 @@
 會自己呼叫 kicad-cli 產生 netlist。若 kicad-cli 不在 PATH，用環境變數指定：
     KICAD_CLI=D:/KiCAD/bin/kicad-cli.exe python hardware/scripts/check_power_rails.py
 
-規格來源：docs/design/011-power-tree.md §2.2（腳位）、§2.3（分壓）、§2.4（電容）
+規格來源：docs/design/011-power-tree.md §2.2（腳位）、§2.3（分壓）、§2.4（電容）、§3（LDO）
 """
 import os
 import re
@@ -37,6 +37,20 @@ CHANNELS = [
 ]
 VREF = 0.6          # RY1303 的 FB 參考電壓
 REG = "U1"          # RY1303 的 designator
+BUCK_CAP = "22uF"   # buck 輸出電容，§2.4
+
+# 兩顆 AP2112K-1.8，出自 011 §3。腳位：1 VIN、2 GND、3 EN、5 VOUT（SOT-25）。
+# EN 內建 3 MΩ 下拉，浮接 = 關機，所以必須接 VIN。
+#   (designator, 輸入軌, 輸出軌)
+LDOS = [
+    ("U2", "+3V3", "+1V8_SOC"),
+    ("U3", "+3V3", "+1V8_HDMI"),
+]
+LDO_CAP = "1uF"     # C_in / C_out，DS Note 4
+
+# 被動件的 footprint 必須來自對應的庫。
+# 之前兩次誤選（電感 → PQFP-160、電容 → SOIC-8）都是複製元件時一起帶過去的。
+FP_LIB = {"C": "Capacitor_SMD:", "R": "Resistor_SMD:", "L": "Inductor_SMD:"}
 
 
 def find_cli():
@@ -64,6 +78,12 @@ def parse(path):
     s = io.open(path, encoding="utf-8").read()
     comps = dict(re.findall(
         r'\(comp\s*\n\s*\(ref "([^"]+)"\)\s*\n\s*\(value "([^"]*)"\)', s))
+    fps = {}
+    for block in re.split(r'\(comp\s*\n', s[:s.index("\t(nets")])[1:]:
+        ref = re.search(r'\(ref "([^"]+)"\)', block)
+        fp = re.search(r'\(footprint "([^"]*)"\)', block)
+        if ref:
+            fps[ref.group(1)] = fp.group(1) if fp else ""
     seg = s[s.index("\t(nets"):]
     nets = {}
     for name, body in re.findall(
@@ -71,7 +91,13 @@ def parse(path):
             r'(?=\n\t\t\(net\n|\Z)', seg, re.S):
         nets[name] = re.findall(
             r'\(ref "([^"]+)"\)\s*\n\s*\(pin "([^"]+)"\)', body)
-    return comps, nets
+    return comps, fps, nets
+
+
+def is_cap(v, target):
+    """'1uF' / '1µF' / '1u' 視為相同。"""
+    norm = lambda x: (x or "").replace("µ", "u").lower().rstrip("f")
+    return norm(v) == norm(target)
 
 
 def ohm(v):
@@ -85,7 +111,7 @@ def ohm(v):
 
 
 def main():
-    comps, nets = parse(export_netlist())
+    comps, fps, nets = parse(export_netlist())
     net_of = lambda ref, pin: next(
         (n for n, v in nets.items() if (ref, pin) in v), None)
 
@@ -127,10 +153,12 @@ def main():
             fails.append(f"{ch} 分壓沒有正確接到 {rail} 與 GND —— "
                          f"最常見的原因是 FB 接到別的通道的腳")
 
-        # ③ 輸出電容
-        caps = [r for r, _ in nets.get(rail, []) if r.startswith("C")]
+        # ③ 輸出電容（只數 22µF —— +3V3 上還掛著 LDO 的 1µF，不能混算）
+        caps = [r for r, _ in nets.get(rail, [])
+                if r.startswith("C") and is_cap(comps.get(r), BUCK_CAP)]
         cok = len(caps) >= ncap
-        print(f"  C    {caps or '無'}（需 ≥{ncap}）{'' if cok else '   ✗'}")
+        print(f"  C    {caps or '無'}（需 ≥{ncap} 顆 {BUCK_CAP}）"
+              f"{'' if cok else '   ✗'}")
         if not cok:
             fails.append(f"{ch} 輸出電容不足（{len(caps)}/{ncap}）")
 
@@ -140,6 +168,62 @@ def main():
         print(f"  EN   {REG}.{en} → {ennet or '✗ 浮接'}{'' if eok else '   ✗'}")
         if not eok:
             fails.append(f"{ch} EN 浮接 —— datasheet 明寫不可")
+
+    # ── LDO ──────────────────────────────────────────
+    for ref, vin, vout in LDOS:
+        print(f"\n{ref}  {comps.get(ref, '✗ 不存在')}  {vin} → {vout}")
+        if ref not in comps:
+            fails.append(f"{ref} 不存在")
+            continue
+        for pin, name, want in (("1", "VIN", vin), ("3", "EN", vin),
+                                ("2", "GND", "GND"), ("5", "VOUT", vout)):
+            got = net_of(ref, pin)
+            ok = got == want
+            print(f"  {name:<4} {ref}.{pin} → {got or '✗ 浮接'}"
+                  f"{'' if ok else f'   ✗ 應為 {want}'}")
+            if not ok:
+                hint = "（EN 內建下拉，浮接 = 關機）" if name == "EN" else ""
+                fails.append(f"{ref} {name} 接到 {got}，應為 {want}{hint}")
+        caps = [r for r, _ in nets.get(vout, [])
+                if r.startswith("C") and is_cap(comps.get(r), LDO_CAP)
+                and any(x[0] == r for x in nets.get("GND", []))]
+        print(f"  Cout {caps or '無'}（需 ≥1 顆 {LDO_CAP} 到 GND）"
+              f"{'' if caps else '   ✗'}")
+        if not caps:
+            fails.append(f"{ref} 輸出 {vout} 缺 {LDO_CAP} 電容")
+
+    # 輸入電容：LDO 的 VIN 共用 +3V3，netlist 分不出哪顆靠哪顆，只能驗總數
+    for vin in {v for _, v, _ in LDOS}:
+        n_ldo = sum(1 for _, v, _ in LDOS if v == vin)
+        caps = [r for r, _ in nets.get(vin, [])
+                if r.startswith("C") and is_cap(comps.get(r), LDO_CAP)]
+        ok = len(caps) >= n_ldo
+        print(f"\nCin  {vin} 上的 {LDO_CAP}：{caps or '無'}（需 ≥{n_ldo}）"
+              f"{'' if ok else '   ✗'}")
+        if not ok:
+            fails.append(f"{vin} 上的 LDO 輸入電容不足（{len(caps)}/{n_ldo}）")
+
+    outs = [o for _, _, o in LDOS]
+    if len(set(outs)) != len(outs):
+        fails.append(f"LDO 輸出軌重複 {outs} —— ADV7511 需要專屬 LDO（011 §3）")
+
+    # ── 被動件 footprint ─────────────────────────────
+    bad, empty = [], []
+    for ref, fp in sorted(fps.items()):
+        lib = FP_LIB.get(re.match(r"[A-Z]+", ref).group())
+        if lib is None or ref.startswith("#"):
+            continue
+        if not fp:
+            empty.append(ref)
+        elif not fp.startswith(lib):
+            bad.append(f"{ref}={fp}")
+    if bad:
+        print(f"\n✗ 被動件 footprint 不在對應的庫：")
+        for b in bad:
+            print(f"    {b}")
+        fails.append(f"footprint 錯庫 {len(bad)} 顆（應為 {'/'.join(FP_LIB.values())}）")
+    if empty:
+        print(f"\n⚠ 尚未指定 footprint（不算失敗）：{empty}")
 
     lone = [n for n, v in nets.items()
             if len(v) < 2 and not n.startswith("unconnected-")]
@@ -152,7 +236,7 @@ def main():
         for f in fails:
             print(f"  ✗ {f}")
         sys.exit(f"\n{len(fails)} 項未通過")
-    print("  ✓ 三路 buck 全部通過")
+    print("  ✓ 三路 buck、兩顆 LDO、被動件 footprint 全部通過")
 
 
 if __name__ == "__main__":
