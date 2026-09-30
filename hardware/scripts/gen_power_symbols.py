@@ -35,8 +35,8 @@ PARTS = [
         "value": "RY1303",
         "footprint": "",   # ⚠ 封裝圖是圖片，pitch / EP 尺寸未核對 → footprint 階段再填
         "datasheet": "docs/reference/peripherals/RY1303_datasheet.pdf",
-        "desc": "RYCHIP 3ch 2A 1.2MHz sync buck, VIN 2.7-5.5V, total Pout < 6W, QFN20-3x3, LCSC C370881",
-        "src": "RY1303 datasheet p.2 Pin Description",
+        "desc": "RYCHIP 3ch 2A sync buck, FSW 1/1.5/2MHz, VIN 2.5-5.5V, total Pout < 6W, QFN20-3x3, LCSC C370881",
+        "src": "RY1303 Datasheet V1.9 p.2 Pin Description（2026-09-30 對原文重核）",
         "width": 25.4,
         "pins": [
             ("10", "VIN1", "power_in", "L", 0),
@@ -59,7 +59,11 @@ PARTS = [
             ("15", "AGNDA", "power_in", "B", 5),
             ("17", "AGNDB", "power_in", "B", 6),
             ("21", "EP",    "power_in", "B", 7),   # 必須焊大片銅箔並接 GND
-            ("16", "NC",    "no_connect", "T", 0),
+            # ⚠ 2026-09-30 更正：pin 16 不是 NC，是 VCC（內部控制電路電源，2.5~5.5V）。
+            #   原標 no_connect 會讓它懸空 → 控制電路沒電 → 整顆 IC 不工作。
+            #   DS V1.9 p.2「Input supply pin for internal control circuit」，
+            #   且 p.3 Absolute Max 把 V_VCC 與三個 V_VIN 並列為輸入電源。
+            ("16", "VCC",   "power_in",   "L", 9),
         ],
     },
     {

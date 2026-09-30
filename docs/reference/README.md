@@ -100,7 +100,9 @@
 ### 還需要取得
 
 ```
-[ ] RY1303 datasheet（三路 DC-DC，MangoPi 用的，若採用）
+[x] RY1303 datasheet **V1.9** —— https://dl.sipeed.com/MAIX/HDK/Chip_DS/RY1303%20Datasheet%20V1.9.pdf
+    ⚠ 舊版 V1.0.x 有多處數字不同（切換頻率、EN 閾值、UVLO、限流、θJA、FB 容差），
+      而且 pin 16 在本版明確寫是 VCC 不是 NC。一律以 V1.9 為準。
 [ ] TPS2051 datasheet（TI，USB Host 限流開關，若採用）
 [ ] XT25F128B datasheet（SPI NOR）
 [ ] 接頭類：RJ45 HR911105A / Type-C / microSD / FPC 座（畫 PCB 前）
