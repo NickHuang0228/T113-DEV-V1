@@ -107,6 +107,7 @@ PCB      4 層 · 阻抗控制 · 100×100mm 以內
 | [docs/design/004-usb-boot.md](docs/design/004-usb-boot.md) | Type-C、FEL、燒錄流程 |
 | [docs/design/005-stackup.md](docs/design/005-stackup.md) | 層疊、阻抗、走線規則 |
 | [docs/design/006-assembly.md](docs/design/006-assembly.md) | 組裝策略、工具選擇、備品 |
+| [docs/design/012-schematic-conventions.md](docs/design/012-schematic-conventions.md) | **原理圖規範：net 命名、元件欄位、更新符號地雷** |
 | [docs/design/007-pinmap.md](docs/design/007-pinmap.md) | bank 策略、腳位分配、排針規格 |
 | [docs/design/008-footprint.md](docs/design/008-footprint.md) | 機構圖實測、EPAD 尺寸、footprint 驗算 |
 | [docs/design/009-bom.md](docs/design/009-bom.md) | **BOM 料況查證、橋接晶片改選 ADV7511** |
