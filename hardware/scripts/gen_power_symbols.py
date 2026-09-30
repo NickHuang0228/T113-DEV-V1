@@ -63,7 +63,10 @@ PARTS = [
             #   原標 no_connect 會讓它懸空 → 控制電路沒電 → 整顆 IC 不工作。
             #   DS V1.9 p.2「Input supply pin for internal control circuit」，
             #   且 p.3 Absolute Max 把 V_VCC 與三個 V_VIN 並列為輸入電源。
-            ("16", "VCC",   "power_in",   "L", 9),
+            #   ⚠ 位置刻意維持在上方(T,0) —— 原本標 NC 時就在這裡。
+            #     若移到左側會讓左側列數由 8 變 10，整個符號變高、所有左右腳的 Y 座標位移，
+            #     已畫好的連線會全部對不上。改名稱與型別不影響幾何，改位置會。
+            ("16", "VCC",   "power_in",   "T", 0),
         ],
     },
     {
