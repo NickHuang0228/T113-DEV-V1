@@ -141,11 +141,24 @@ def main():
         if not eok:
             fails.append(f"{ch} EN 浮接 —— datasheet 明寫不可")
 
+    # 跨頁訊號在對手方那一頁畫好之前，本頁只會看到一個連接點 —— 那不是錯。
+    # 這裡列出「已知還在等其他頁」的 net，畫到那一頁時要從這裡移除。
+    PENDING_CROSS_SHEET = {
+        "USB_EN":      "等主晶片頁的 T113 GPIO",
+        "USB_OC_N":    "等主晶片頁的 T113 GPIO",
+        "SYS_RESET_N": "等主晶片頁的 T113 pin 27",
+    }
     lone = [n for n, v in nets.items()
             if len(v) < 2 and not n.startswith("unconnected-")]
-    if lone:
-        print(f"\n⚠ 只有一個連接點的 net：{lone}")
-        fails.append(f"孤立 net：{lone}")
+    waiting = [n for n in lone if n in PENDING_CROSS_SHEET]
+    real = [n for n in lone if n not in PENDING_CROSS_SHEET]
+    if waiting:
+        print("\n· 跨頁訊號（尚未接上對手方，非錯誤）：")
+        for n in waiting:
+            print(f"    {n} —— {PENDING_CROSS_SHEET[n]}")
+    if real:
+        print(f"\n⚠ 只有一個連接點的 net：{real}")
+        fails.append(f"孤立 net：{real}")
 
     print("\n" + "=" * 52)
     if fails:
