@@ -2089,3 +2089,57 @@ T2 = 190 ms > 64 ms  ✓  餘裕仍近 3 倍
 [ ] §6.1 R9 DZQ 240Ω 1%
 [ ] §6.3 U5 TPS2051B USB-A 限流
 ```
+
+
+---
+
+## 2026-10-01 · 主晶片頁開工，unit 1（26 支電源腳）完成
+
+### 建立新頁
+
+```
+根圖紙掛上 mcu.kicad_sch（圖紙名「Main Chip」）
+U6 = T113-S3，七個 unit
+```
+
+### unit 1 的供電骨架
+
+```
++0V9        VDD-CORE0/1、VDD-SYS0/1/2              5 腳
++1V5        VCC-DRAM0/1                            2 腳
++3V3        VCC-IO/PD/PE/PG/TVOUT、LDO-IN          6 腳
++1V8_SOC    VCC-PLL/RTC/LVDS、VDD18-DRAM、VCC-TVIN  5 腳
++1V8_AUDIO  LDOA-OUT、AVCC、HPVCC                   3 腳
+GND         AGND、EPAD                             2 腳
+獨立 net    LDOB-OUT(C17 2.2µF)、VRA1(C18)、VRA2(C19)  3 腳
+```
+
+### ★ 三個「輸出型」腳位不可接電源軌
+
+```
+LDOA-OUT   晶片內建 LDO 的輸出 → 只接 +1V8_AUDIO 這條獨立 net
+LDOB-OUT   不使用 → 只掛 2.2µF 到地，不接任何軌
+VRA1/VRA2  Internal Reference Voltage，Type = AO → 只掛電容到地
+```
+
+**接到電源軌上就是兩個源打架。** 這和電源頁踩過的「U3 的 VOUT 接到 U2 的輸出」
+是同一類錯誤，只是這次在畫之前就先確認了 datasheet 的 Type 欄。
+
+**查 Type 欄比查名稱可靠** —— `LDOA-OUT` 名字裡有 OUT 看得出來，
+但 `VRA1` / `VRA2` 完全看不出方向，只有 Table 4-4 的 `AO` 說得準。
+
+### 待確認
+
+```
+[ ] VRA1/VRA2 的去耦電容值 —— 暫用 0.1µF
+    DS 只寫 "Internal Reference Voltage" + Type AO，沒給建議值
+    要對 MangoPi 原理圖的實際值
+```
+
+### 下一步
+
+```
+[ ] unit 2  PB/PC/PF（19 腳）—— microSD、SPI NOR、UART0 console
+[ ] unit 3~7
+[ ] 去耦電容（011 §7 去耦總表，每支電源腳一顆）
+```
