@@ -423,7 +423,7 @@
         "uuid": "00000000-0000-0000-0000-000000000001"
       }
     ],
-    "used_designators": "U1-3,L1-4,#PWR1-34,R1-7,C1-12",
+    "used_designators": "U1-6,L1-4,#PWR1-59,R1-9,C1-19",
     "variants": []
   },
   "sheets": [
@@ -434,6 +434,10 @@
     [
       "04570e9e-060d-4156-8a20-e24c8ec7616f",
       "電源"
+    ],
+    [
+      "7f97ae6a-33ec-4e0e-ba66-9f0706cad2ae",
+      "Main Chip"
     ]
   ],
   "text_variables": {},

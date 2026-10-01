@@ -12,7 +12,7 @@
 
 ```
 階段 0  規格與選型     ████████████  完成
-階段 1  原理圖         ███░░░░░░░░░  進行中  ← 現在在這
+階段 1  原理圖         █████░░░░░░░  進行中  ← 現在在這（電源頁完成）
 階段 2  PCB layout     ░░░░░░░░░░░░
 階段 3  出圖與下單     ░░░░░░░░░░░░
 階段 4  bring-up       ░░░░░░░░░░░░
@@ -67,11 +67,14 @@ BOM 價格    T113 實價是原估的 2.8 倍，總成本待重算
 **畫完電源頁 `hardware/power.kicad_sch`**，照 `011-power-tree.md` v0.2。
 
 ```
-已完成   RY1303 輸入側、EN1 延遲 RC、三顆電感
-待放     輸出電容 22µF ×4（+0V9 ×1、+1V5 ×1、+3V3 ×2）
-         分壓電阻 232K / 76.8K / 25.5K + 51.0K ×3
-         兩顆 1.8V LDO、RESET supervisor
-待修     還有一顆 power:+3.3V 未統一成 +3V3
+★ 電源頁畫完了（32 元件、18 條 net、值全填、無命名衝突）
+
+已完成   RY1303 全部 21 腳、三路 buck、兩顆 AP2112K LDO、
+         APX803 RESET supervisor、TPS2051B USB-A 限流
+待補     ① 32 個元件的 Footprint 與 LCSC 欄位全是空的
+         ② U5 的 IN 側缺一顆 0.1µF 去耦（貼著 pin 5）
+         ③ 跑一次 ERC
+下一頁   主晶片頁（T113-S3 + 去耦 + R9 DZQ 240R）
 ```
 
 ⚠ 分壓的上端要接在輸出電容之後（真正的輸出 net），不是電感前的 SW 腳。
@@ -101,6 +104,7 @@ BOM 價格    T113 實價是原估的 2.8 倍，總成本待重算
 | 電源怎麼配 | `docs/design/011-power-tree.md` |
 | 顯示鏈路 | `docs/design/002-display.md` |
 | 走線規則 | `docs/design/005-stackup.md` |
+| **畫原理圖的規矩** | **`docs/design/012-schematic-conventions.md`** |
 | 要買什麼料 | `docs/design/009-bom.md` |
 | 怎麼焊 | `docs/design/006-assembly.md` |
 | 發生過什麼 | `notes/devlog.md`（最長，但只是流水帳） |
