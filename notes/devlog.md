@@ -2143,3 +2143,64 @@ VRA1/VRA2  Internal Reference Voltage，Type = AO → 只掛電容到地
 [ ] unit 3~7
 [ ] 去耦電容（011 §7 去耦總表，每支電源腳一顆）
 ```
+
+
+---
+
+## 2026-10-02 · unit 2（19 腳）完成；一個被 KiCad 靜默覆蓋的修正
+
+### unit 2 的去處
+
+```
+SDC0 → microSD    PF0~PF5    全域標籤
+SPI0 → SPI NOR    PC2~PC7    全域標籤
+測試點             PB2~PB7    TP1~TP6
+                  PF6        TP7
+```
+
+⚠ **SDC0 的資料線編號不順**：`PF0=D1`、`PF1=D0`、`PF4=D3`、`PF5=D2`。
+照 datasheet 抄，不要自己推 —— 這種地方推錯了 netlist 也看不出來（名字都合法）。
+
+### PB2~PB7 的規劃被推翻
+
+007 §6.3 原本寫「I2S2 音訊 codec」，查 Table 4-3 後發現站不住：
+
+```
+I2S2 的 mux 有兩組   PB2~PB7  與  PF0/PF1/PF3/PF5/PF6
+PF 那組已經給 SDC0   所以只能用 PB
+但本板音訊是 T113 內建 codec（unit 6 的 AVCC/HPVCC/HPOUTL-R）
+→ 根本不需要外接 I2S codec
+```
+
+改為測試點。不拉排針的理由是 §4 規則①：**PB 在 VCC-IO bank，
+那條軌同時掛著 microSD、SPI NOR、UART0 console，燒了就變無法診斷的磚。**
+
+### ★ KiCad 靜默覆蓋了一個已 commit 的修正
+
+```
+2413442   已把 mcu 頁的 C17~C19 從 DIP-24 改成 C_0603，並 commit
+之後      KiCad 還開著舊的記憶體狀態，畫完 unit 2 存檔時整頁寫回去
+結果      三顆 footprint 又變回 DIP-24
+```
+
+**危險在於沉默**：git 只顯示「檔案被修改」，看不出是哪些修正被洗掉。
+要不是 `check_power_rails.py` 的 footprint 檢查抓到，那三顆會一路帶到 layout。
+
+```
+git pull 下來的改動   不會反映到已開著的 KiCad 視窗
+KiCad 存檔           是整頁寫回去，不是做 diff
+```
+
+→ 012 新增 §6.2：**pull 之後、或任何人在檔案層改過 .kicad_sch 之後，一律關掉 KiCad 再重開。**
+
+這是繼「更新符號會清值」之後，第二個「KiCad 的操作會靜默破壞已有成果」的坑。
+
+### 下一步
+
+```
+[ ] unit 3  PD 顯示（23 腳）—— MIPI DSI + RGB666，含 10 顆 0Ω 分支
+[ ] unit 4  PE 網路（14 腳）
+[ ] unit 5  PG 排針（16 腳）
+[ ] unit 6  類比音訊（19 腳）
+[ ] unit 7  系統/USB（12 腳）
+```

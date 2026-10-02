@@ -287,11 +287,41 @@ CSI 砍掉後 PE bank 單純化。**PE11~PE13 保留為 PHY RESET / LED 控制�
 PF0 ~ PF5    SDC0 → microSD（主要開機）
              ├ PF2 / PF4 另經 2 顆 0Ω 分支到 CH340N（UART0 console）  → §5.2
              └ PF0 / PF1 / PF3 / PF5 旁放 4 個 JTAG 測試點           → §5.4
-PF6          備用
+PF6          ★ 測試點 TP7
 PC2 ~ PC7    SPI0 → SPI NOR 16MB（備援開機）
              └ ⚠ PC4 / PC5 同時是 BOOT-SEL strap                    → §5.3
-PB2 ~ PB7    I2S2 音訊 codec / TWI 備用
+PB2 ~ PB7    ★ 測試點 TP1~TP6（2026-10-02 定案，見下）
              └ ⚠ 沒有 PB0 / PB1，此封裝未引出                       → §5.1
+```
+
+#### 2026-10-02：PB2~PB7 與 PF6 定為測試點
+
+原本寫「I2S2 音訊 codec」，查完 Table 4-3 後發現那個規劃站不住：
+
+```
+I2S2 的 mux 有兩組   PB2~PB7  與  PF0/PF1/PF3/PF5/PF6
+PF 那組已經給 SDC0   所以只能用 PB 那組
+但本板的音訊是 T113 內建 codec（AVCC/HPVCC/HPOUTL-R，unit 6）
+→ 根本不需要外接 I2S codec
+```
+
+所以這 6 腳沒有用途。三個選項的取捨：
+
+```
+A. 全部不接     最乾淨，但浪費 6 支腳
+B. 拉到排針     ✗ PB 在 VCC-IO bank，§4 規則① 明說不可對外
+C. 留測試點     ✓ 成本 $0，保留日後飛線的彈性
+```
+
+**採用 C。** 跟 PF0/PF1/PF3/PF5 的 JTAG 測試點同一個做法 ——
+不能對外接排針（燒了會失去開機裝置 + console），但測試點只有自己會碰，風險可控。
+
+`PF6` 同理：它的 mux 有 `OWA-OUT / IR-RX / I2S2-MCLK / PWM5 / PF-EINT6`，
+日後可能用得上，但一樣不能對外。
+
+```
+TP1~TP6  PB2~PB7      TestPoint:TestPoint_Pad_D1.5mm
+TP7      PF6          同上
 ```
 
 #### ⚠ PB2~PB7 同時是 RGB888 缺的那 6 個 bit —— 這是一個被放棄的選項
