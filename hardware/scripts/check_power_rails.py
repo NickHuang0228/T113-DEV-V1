@@ -228,9 +228,16 @@ def main():
     # 跨頁訊號在對手方那一頁畫好之前，本頁只會看到一個連接點 —— 那不是錯。
     # 這裡列出「已知還在等其他頁」的 net，畫到那一頁時要從這裡移除。
     PENDING_CROSS_SHEET = {
+        # 電源頁 → 主晶片頁
         "USB_EN":      "等主晶片頁的 T113 GPIO",
         "USB_OC_N":    "等主晶片頁的 T113 GPIO",
         "SYS_RESET_N": "等主晶片頁的 T113 pin 27",
+        # 主晶片頁 unit 2 → 儲存頁（microSD 座）
+        **{f"SDC0_{x}": "等儲存頁的 microSD 座"
+           for x in ("CLK", "CMD", "D0", "D1", "D2", "D3")},
+        # 主晶片頁 unit 2 → 儲存頁（SPI NOR）
+        **{f"SPI0_{x}": "等儲存頁的 SPI NOR"
+           for x in ("CLK", "CS0", "MOSI", "MISO", "WP", "HOLD")},
     }
     lone = [n for n, v in nets.items()
             if len(v) < 2 and not n.startswith("unconnected-")]
