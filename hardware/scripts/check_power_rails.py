@@ -238,6 +238,16 @@ def main():
         # 主晶片頁 unit 2 → 儲存頁（SPI NOR）
         **{f"SPI0_{x}": "等儲存頁的 SPI NOR"
            for x in ("CLK", "CS0", "MOSI", "MISO", "WP", "HOLD")},
+        # 主晶片頁 unit 3 → 顯示頁（MIPI FPC 座，直通）
+        **{f"DSI_{x}": "等顯示頁的 MIPI FPC 座"
+           for x in ("D0P", "D0N", "D1P", "D1N", "CKP", "CKN",
+                     "D2P", "D2N", "D3P", "D3N")},
+        # 主晶片頁 unit 3 → 顯示頁（ADV7511，經 0Ω 分支）
+        **{f"LCD0_{x}": "等顯示頁的 ADV7511"
+           for x in ("D2", "D3", "D4", "D5", "D6", "D7",
+                     "D10", "D11", "D12", "D13", "D14", "D15",
+                     "D18", "D19", "D20", "D21", "D22", "D23",
+                     "CLK", "DE", "HSYNC", "VSYNC")},
     }
     lone = [n for n, v in nets.items()
             if len(v) < 2 and not n.startswith("unconnected-")]
