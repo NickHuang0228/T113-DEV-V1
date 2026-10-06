@@ -248,7 +248,40 @@ def main():
                      "D10", "D11", "D12", "D13", "D14", "D15",
                      "D18", "D19", "D20", "D21", "D22", "D23",
                      "CLK", "DE", "HSYNC", "VSYNC")},
+        # 主晶片頁 unit 4 → 網路頁（RTL8201F）
+        **{f"RMII_{x}": "等網路頁的 RTL8201F"
+           for x in ("CRS_DV", "RXD0", "RXD1", "REF_CLK", "TXD0", "TXD1",
+                     "TX_EN", "RXER", "MDC", "MDIO")},
+        "PHY_RESET_N": "等網路頁的 RTL8201F",
+        # 主晶片頁 unit 5 → 排針頁
+        **{f"HDR_GPIO{i}": "等排針頁的 2x14 排針" for i in range(10)},
+        **{f"HDR_{x}": "等排針頁的 2x14 排針"
+           for x in ("I2C1_SCL", "I2C1_SDA", "I2C2_SCL", "I2C2_SDA",
+                     "UART1_TX", "UART1_RX")},
     }
+
+    # ── 標籤重複：不該連的被連在一起 ────────────────────
+    # 前五次命名坑都是「名字寫錯 → 該連的沒連」，會留下孤立 net，檢查得到。
+    # 2026-10-05 踩到相反的一種：PG0 與 PG1 都標成 HDR_GPIO2 ——
+    # 兩支 GPIO 透過各自的 330R 接在一起，軟體一高一低就有穿流，
+    # 而且少一個對外接點、GPIO4 憑空消失。
+    # 這種錯 netlist 完全合法、看起來一切正常，只有逐一比對才抓得到。
+    from collections import Counter
+    SIGNAL_PREFIX = ("HDR_", "LCD0_", "DSI_", "SDC0_", "SPI0_", "RMII_")
+    dup_sig = Counter()
+    for n, v in nets.items():
+        if n.startswith(("unconnected-", "Net-")) or not n.startswith(SIGNAL_PREFIX):
+            continue
+        rs = [r for r, _ in v if r.startswith("R")]
+        if len(rs) > 1:
+            dup_sig[n] = len(rs)
+    if dup_sig:
+        print()
+        print("✗ 同一條訊號 net 掛了多顆電阻（可能是兩支腳標成同名）：")
+        for n, c in dup_sig.items():
+            print(f"    {n}  ×{c}")
+        fails.append(f"訊號 net 重複：{dict(dup_sig)}")
+
     lone = [n for n, v in nets.items()
             if len(v) < 2 and not n.startswith("unconnected-")]
     waiting = [n for n in lone if n in PENDING_CROSS_SHEET]
