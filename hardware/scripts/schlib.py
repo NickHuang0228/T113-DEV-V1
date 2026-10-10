@@ -70,6 +70,26 @@ def no_connect(x, y):
 """
 
 
+def text(body, x, y, size=1.27):
+    """圖紙上的文字註記。
+
+    佈線時看的是原理圖，不是 docs/ 下的 markdown ——
+    「0Ω 焊盤距主幹 ≤ 0.5mm」這種規則寫在文件裡等於沒寫。
+    """
+    return f"""	(text "{esc(body)}"
+		(exclude_from_sim no)
+		(at {g(x)} {g(y)} 0)
+		(effects
+			(font
+				(size {size:g} {size:g})
+			)
+			(justify left bottom)
+		)
+		(uuid "{uid()}")
+	)
+"""
+
+
 def global_label(name, x, y, rot=0, shape="input", justify="right"):
     return f"""	(global_label "{esc(name)}"
 		(shape {shape})
@@ -266,6 +286,29 @@ def guard_kicad_closed(root):
 R_FP = "Resistor_SMD:R_0603_1608Metric"
 C_FP = "Capacitor_SMD:C_0603_1608Metric"
 
+# net 名稱 → 用哪個 power 符號當圖示。
+#
+# 這張表存在的理由：power 符號的 lib_id 必須是 KiCad 內建真的有的那幾個，
+# 但 net 名稱是我們自己取的。直接把 net 名稱當 lib_id（power:HDMI_5V）
+# 會生出一顆不存在的符號，KiCad 開檔時整頁變成問號。
+# 新增電源軌一定要先加進這裡 —— 這是刻意的檢查點。
+RAIL_SYMBOL = {
+    "GND": "GND",
+    "GND_CHASSIS": "Earth",
+    "+3V3": "+3V3",
+    "+5V_VBUS": "+5V",
+    "+5V_USB": "+5V",
+    "HDMI_5V": "+5V",
+    "+1V5": "+1V5",
+    "+0V9": "+1V8",
+    "+1V8_SOC": "+1V8",
+    "+1V8_AUDIO": "+1V8",
+    "+1V8_HDMI": "+1V8",
+    "+1V8_DVDD": "+1V8",
+    "+1V8_AVDD": "+1V8",
+    "+1V8_PLVDD": "+1V8",
+}
+
 
 class Page:
     def __init__(self, path, project_root=None):
@@ -295,8 +338,19 @@ class Page:
         self.out.append(global_label(name, x, y, 180 if left else 0,
                                      justify="right" if left else "left"))
 
-    def rail(self, kind, x, y, net=None):
-        self.out.append(power(kind, x, y, 0, self.sheet, net))
+    def note(self, body, x, y, size=1.27):
+        """把 layout 規則寫在圖紙上。多行用 
+ 分隔。"""
+        self.out.append(text(body, x, y, size))
+
+    def rail(self, net, x, y, kind=None):
+        """電源符號。傳 net 名稱，圖示由 RAIL_SYMBOL 查表決定。"""
+        k = kind or RAIL_SYMBOL.get(net)
+        if k is None:
+            raise SystemExit(
+                f"✗ 不認得電源軌 {net} —— 先加進 schlib.RAIL_SYMBOL。"
+                f"直接拿 net 名稱當 lib_id 會生出不存在的 power:{net}。")
+        self.out.append(power(k, x, y, 0, self.sheet, net))
 
     def part(self, lib_id, ref, value, x, y, rot=0, fp="", unit=1,
              pins=("1", "2"), desc="", ref_dy=-7.62, val_dy=-5.08):
@@ -318,21 +372,21 @@ class Page:
         self.w(x, y, x + dx, y)
         self.lab(name, x + dx, y, left=(side == "L"))
 
-    def pin_rail(self, x, y, side, kind, stub=6.35, net=None):
+    def pin_rail(self, x, y, side, net, stub=6.35):
         dx = -stub if side == "L" else stub
         self.w(x, y, x + dx, y)
-        self.rail(kind, x + dx, y, net)
+        self.rail(net, x + dx, y)
 
-    def pin_res_rail(self, x, y, side, ref, value, kind, stub=7.62):
+    def pin_res_rail(self, x, y, side, ref, value, net, stub=7.62):
         """腳 →（水平電阻）→ 電源。RSET、strap 都是這個形狀。"""
         s = -1 if side == "L" else 1
         a = x + s * stub
         self.w(x, y, a, y)
         self.res(ref, value, a + s * 3.81, y, 90)
         self.w(a + s * 7.62, y, a + s * 12.7, y)
-        self.rail(kind, a + s * 12.7, y)
+        self.rail(net, a + s * 12.7, y)
 
-    def pin_res_rail_v(self, x, y, side, ref, value, kind, stub=7.62, up=True):
+    def pin_res_rail_v(self, x, y, side, ref, value, net, stub=7.62, up=True):
         """腳 →（往上/下的垂直電阻）→ 電源。給右側腳用，避免跟相鄰腳的標籤撞在一起。"""
         s = -1 if side == "L" else 1
         a = x + s * stub
@@ -341,7 +395,7 @@ class Page:
         self.w(a, y, a, y + d * 3.81)
         self.res(ref, value, a, y + d * 7.62, 0)
         self.w(a, y + d * 11.43, a, y + d * 13.97)
-        self.rail(kind, a, y + d * 13.97)
+        self.rail(net, a, y + d * 13.97)
 
     # —— 叢集 ——
     def strap_bank(self, x, y, rows, pitch=15.24):
@@ -387,6 +441,42 @@ class Page:
             self.rail(top, mid, ty - 2.54)
         self.w(mid, by, mid, by + 2.54)
         self.rail(bottom, mid, by + 2.54)
+
+    def series_bank(self, x, y, rows, pitch=10.16):
+        """一疊「全域標籤 →（串聯電阻）→ 另一個全域標籤」。
+
+        給 0Ω 隔離與阻尼電阻用。兩端一定是不同的 net 名稱 ——
+        同名的話電阻就被短路掉了，而 netlist 看起來完全正常。
+        rows = [(左邊 net, ref, value, 右邊 net), ...]
+        """
+        for i, (a, ref, value, b) in enumerate(rows):
+            if a == b:
+                raise SystemExit(f"✗ {ref} 兩端同名 ({a}) —— 電阻會被短路")
+            yy = y + i * pitch
+            self.lab(a, x, yy, left=True)
+            self.w(x, yy, x + 7.62, yy)
+            self.res(ref, value, x + 11.43, yy, 90)
+            self.w(x + 15.24, yy, x + 20.32, yy)
+            self.lab(b, x + 20.32, yy)
+
+    def lc_filter(self, x, y, src, dst, lref, lval, cref, cval, cfp=None):
+        """LC 濾波：來源軌 →[電感]→ 目的軌，中間掛一顆電容到地。
+
+        LDO 之後還要 LC，是因為 LDO 對開關頻率（本板 1.2 MHz）的 PSRR
+        已經不高，而 ADV7511 的 AVDD/PLVDD 在那個頻段只容許 ~1.7 mV rms。
+        """
+        self.w(x, y, x + 7.62, y)
+        self.rail(src, x, y)
+        self.part("Device:L", lref, lval, x + 11.43, y, 90,
+                  "Inductor_SMD:L_1210_3225Metric", desc="Inductor",
+                  ref_dy=-3.81, val_dy=3.81)
+        self.w(x + 15.24, y, x + 22.86, y)
+        self.j(x + 19.05, y)
+        self.w(x + 19.05, y, x + 19.05, y + 3.81)
+        self.cap(cref, cval, x + 19.05, y + 7.62, 0, cfp)
+        self.w(x + 19.05, y + 11.43, x + 19.05, y + 13.97)
+        self.rail("GND", x + 19.05, y + 13.97)
+        self.rail(dst, x + 22.86, y)
 
     # —— 收尾 ——
     def commit(self, note=None):

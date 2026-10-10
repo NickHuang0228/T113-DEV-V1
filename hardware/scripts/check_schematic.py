@@ -27,7 +27,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 HW = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
+# KiCad 10 的 Windows 安裝預設落在使用者目錄，不是 Program Files。
+# 只寫 Program Files 的話這支檢查器會「安靜地找不到 kicad-cli」——
+# 比報錯更糟：以為驗過了，其實整支沒跑。
 KICAD_CLI_CANDIDATES = [
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\kicad-cli.exe"),
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\KiCad\9.0\bin\kicad-cli.exe"),
     r"C:\Program Files\KiCad\10.0\bin\kicad-cli.exe",
     r"C:\Program Files\KiCad\9.0\bin\kicad-cli.exe",
     "kicad-cli",

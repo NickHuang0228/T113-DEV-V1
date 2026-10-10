@@ -204,7 +204,7 @@ def main():
     # pin 8 與 SH 都當機殼地 —— 它們在符號上都畫在連接器下緣。
     for px in (jx + 10.16, jx + 15.24):
         p.w(px, jy + 10.16, px, jy + 15.24)
-        p.rail("Earth", px, jy + 15.24, net="GND_CHASSIS")
+        p.rail("GND_CHASSIS", px, jy + 15.24)
     # 兩顆 LED：陽極經 330R 到 +3V3，陰極由 PHY 下沉點亮。
     for ref, dy in (("R67", 7.62), ("R68", -2.54)):
         p.pin_res_rail(jx + 22.86, jy - dy, "R", ref, "330R", "+3V3")
@@ -227,7 +227,7 @@ def main():
     p.w(ix - 6.35, iy - 3.81, ix + 6.35, iy - 3.81)
     p.w(ix - 6.35, iy + 3.81, ix + 6.35, iy + 3.81)
     p.w(ix, iy - 3.81, ix, iy - 6.35)
-    p.rail("Earth", ix, iy - 6.35, net="GND_CHASSIS")
+    p.rail("GND_CHASSIS", ix, iy - 6.35)
     p.w(ix, iy + 3.81, ix, iy + 6.35)
     p.rail("GND", ix, iy + 6.35)
     p.stat["地隔離"] = 2
