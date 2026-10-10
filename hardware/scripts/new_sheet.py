@@ -35,6 +35,8 @@ ROW_Y = (39.37, 109.22, 179.07)
 
 
 def blank_sheet(title):
+    """空白子頁。刻意不放 sheet_instances —— 那個區塊只屬於根圖紙，
+    子頁放了會讓 instances 路徑的查找拿到 "/"（已核對過 mcu.kicad_sch 沒有）。"""
     return f"""(kicad_sch
 \t(version 20260306)
 \t(generator "eeschema")
@@ -45,11 +47,6 @@ def blank_sheet(title):
 \t\t(title "{esc(title)}")
 \t)
 \t(lib_symbols
-\t)
-\t(sheet_instances
-\t\t(path "/"
-\t\t\t(page "1")
-\t\t)
 \t)
 \t(embedded_fonts no)
 )
