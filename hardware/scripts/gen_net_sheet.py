@@ -103,9 +103,10 @@ def main():
 
     # ── unit 1  電源與類比 ──────────────────────────────
     place(1, U1_PINS, "RTL8201F 電源與類比")
-    for n, kind in RAILS.items():
-        x, y, s = P1[n]
-        p.pin_rail(x, y, s, kind)
+    # 三支 +3V3 走一條匯流排 —— 三個電源符號擠在 2.54mm 裡文字會疊
+    p.pin_bus([(P1[n][0], P1[n][1]) for n in ("14", "30", "7")], "L", "+3V3")
+    x, y, s = P1["33"]
+    p.pin_rail(x, y, s, "GND")
     # RSET：1% 參考電阻，決定 MDI 驅動電流。漏了或換成 5% 的，鏈路跑不起來。
     x, y, s = P1["1"]
     p.pin_res_rail(x, y, s, "R60", "2.49K 1%", "GND")
@@ -162,21 +163,22 @@ def main():
     p.part("Device:Crystal_GND24", "Y1", "25MHz", cx, cy, 0,
            "Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm", 1, ("1", "2", "3", "4"),
            "Two pin crystal, GND on pins 2 and 4", ref_dy=-8.89, val_dy=-6.35)
-    p.w(cx - 3.81, cy, cx - 11.43, cy)
-    p.lab("XTAL_IN", cx - 11.43, cy, left=True)
-    p.w(cx + 3.81, cy, cx + 11.43, cy)
-    p.lab("XTAL_OUT", cx + 11.43, cy)
+    p.w(cx - 3.81, cy, cx - 17.78, cy)
+    p.lab("XTAL_IN", cx - 17.78, cy, left=True)
+    p.w(cx + 3.81, cy, cx + 17.78, cy)
+    p.lab("XTAL_OUT", cx + 17.78, cy)
     p.w(cx, cy + 5.08, cx, cy + 7.62)
     p.rail("GND", cx, cy + 7.62)
     # 負載電容：22pF 是對應 20pF 負載的晶振 + 約 5pF 板上寄生。
     # 換晶振要重算，這是唯一會讓 PHY「時而能通時而不能」的地方。
-    for ref, lx in (("C70", cx - 3.81), ("C71", cx + 3.81)):
+    # 兩顆負載電容要離開 7.62mm 以上，否則 ref/value 文字會互相蓋
+    for ref, lx in (("C70", cx - 12.7), ("C71", cx + 12.7)):
         p.w(lx, cy, lx, cy + 8.89)
         p.cap(ref, "22pF", lx, cy + 12.7, 0)
         p.w(lx, cy + 16.51, lx, cy + 19.05)
         p.rail("GND", lx, cy + 19.05)
-    p.j(cx - 3.81, cy)
-    p.j(cx + 3.81, cy)
+    p.j(cx - 12.7, cy)
+    p.j(cx + 12.7, cy)
     p.stat["晶振"] = 5
 
     # ── 去耦 ───────────────────────────────────────────
@@ -199,17 +201,20 @@ def main():
     for dy, net in ((7.62, "MDI0_P"), (2.54, "MDI0_N"),
                     (0.0, "MDI1_P"), (-5.08, "MDI1_N")):
         p.pin_label(jx - 20.32, jy - dy, "L", net)
-    for dy in (5.08, -2.54):                             # TCT / RCT
-        p.pin_rail(jx - 20.32, jy - dy, "L", "+3V3")
+    # TCT/RCT 的 +3V3 要比 MDI 標籤再往左，不然兩種文字會疊
+    p.pin_bus([(jx - 20.32, jy - 5.08)], "L", "+3V3", 12.7, 5.08)
+    p.pin_bus([(jx - 20.32, jy + 2.54)], "L", "+3V3", 17.78, 5.08)
     # pin 8 與 SH 都當機殼地 —— 它們在符號上都畫在連接器下緣。
-    for px in (jx + 10.16, jx + 15.24):
-        p.w(px, jy + 10.16, px, jy + 15.24)
-        p.rail("GND_CHASSIS", px, jy + 15.24)
+    # 兩支都接機殼地，但符號不能並排 —— GND_CHASSIS 這串字比符號寬得多
+    p.w(jx + 10.16, jy + 10.16, jx + 10.16, jy + 15.24)
+    p.w(jx + 15.24, jy + 10.16, jx + 15.24, jy + 22.86)
+    p.rail("GND_CHASSIS", jx + 10.16, jy + 15.24)
+    p.rail("GND_CHASSIS", jx + 15.24, jy + 22.86)
     # 兩顆 LED：陽極經 330R 到 +3V3，陰極由 PHY 下沉點亮。
     for ref, dy in (("R67", 7.62), ("R68", -2.54)):
-        p.pin_res_rail(jx + 22.86, jy - dy, "R", ref, "330R", "+3V3")
+        p.pin_res_rail(jx + 22.86, jy - dy, "R", ref, "330R", "+3V3", stub=12.7)
     for dy, net in ((5.08, "PHY_LED0"), (-5.08, "PHY_LED1")):
-        p.pin_label(jx + 22.86, jy - dy, "R", net)
+        p.pin_label(jx + 22.86, jy - dy, "R", net, stub=15.24)
     p.stat["RJ45"] = 4 + 2 + 2 + 2 + 2
 
     # 中心抽頭的去耦：擺在連接器旁邊，是這兩顆電容唯一的作用。

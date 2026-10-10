@@ -41,9 +41,11 @@ ADV_FP = "Package_QFP:LQFP-100_14x14mm_P0.5mm"
 PINX = 30.48                     # 符號：WIDTH/2 + PIN_LEN = 25.4 + 5.08
 
 # ── 五個 unit 的腳位排列（必須與 gen_adv7511_symbol.py 的 UNITS 同序）──
+# ⚠ 左側依「接哪一條軌」分組排列，與 gen_adv7511_symbol.py 的 UNITS[0] 同序。
+#   同軌的腳相鄰，才能走一條匯流排、只放一個電源符號。
 U1_PINS = [("1", "L"), ("19", "L"), ("49", "L"), ("76", "L"), ("77", "L"),
-           ("24", "L"), ("25", "L"), ("21", "L"), ("26", "L"),
-           ("29", "L"), ("34", "L"), ("41", "L"), ("47", "L"),
+           ("24", "L"), ("25", "L"), ("29", "L"), ("34", "L"), ("41", "L"),
+           ("21", "L"), ("26", "L"), ("47", "L"),
            ("18", "R"), ("20", "R"), ("22", "R"), ("23", "R"), ("27", "R"),
            ("31", "R"), ("37", "R"), ("44", "R"), ("75", "R"), ("99", "R"),
            ("100", "R")]
@@ -148,18 +150,32 @@ def main():
     for u, pins in ((1, U1_PINS), (2, U2_PINS), (3, U3_PINS),
                     (4, U4_PINS), (5, U5_PINS)):
         p.part(ADV, "U7", "ADV7511KSTZ", *AT[u], 0, ADV_FP, u,
-               [n for n, _ in pins], desc[u], ref_dy=-24.13, val_dy=24.13)
+               [n for n, _ in pins], desc[u], ref_dy=-24.13, val_dy=29.21)
 
     def at(n):
         return P[UNIT_OF[n]][n]
 
-    # ── 電源與地 ──────────────────────────────────────
-    for n, kind in PWR.items():
-        x, y, s = at(n)
-        p.pin_rail(x, y, s, kind)
-    for n in GND_PINS:
-        x, y, s = at(n)
-        p.pin_rail(x, y, s, "GND")
+    # ── 電源與地：同一條軌走一條匯流排 ────────────────
+    def bus(nums, net, stub=6.35):
+        """把一串腳號依 (unit, 左右) 與 y 的連續性切成幾段，各走一條匯流排。"""
+        by = {}
+        for n in nums:
+            x, y, side = at(n)
+            by.setdefault((UNIT_OF[n], side, x), []).append(y)
+        for (u, side, x), ys in by.items():
+            ys.sort()
+            run = [ys[0]]
+            for y in ys[1:]:
+                if abs(y - run[-1]) <= 2.54 + 1e-6:
+                    run.append(y)
+                else:
+                    p.pin_bus([(x, v) for v in run], side, net, stub)
+                    run = [y]
+            p.pin_bus([(x, v) for v in run], side, net, stub)
+
+    for i, net in enumerate(("+1V8_DVDD", "+1V8_AVDD", "+1V8_PLVDD", "+3V3")):
+        bus([n for n, k in PWR.items() if k == net], net, 6.35 + i * 2.54)
+    bus(GND_PINS, "GND")
     p.stat["電源腳"] = len(PWR)
     p.stat["接地腳"] = len(GND_PINS)
 
@@ -167,9 +183,7 @@ def main():
     for n, net in DIRECT.items():
         x, y, s = at(n)
         p.pin_label(x, y, s, net)
-    for n in VID_GND:
-        x, y, s = at(n)
-        p.pin_rail(x, y, s, "GND")
+    bus(VID_GND, "GND", 15.24)   # 離訊號標籤遠一點，不然文字會疊
     p.stat["RGB 訊號"] = len(DIRECT)
     p.stat["未用輸入接地"] = len(VID_GND)
 
@@ -213,7 +227,7 @@ def main():
     p.stat["去耦電容"] = 13
 
     # ── 上下拉（002 §3.2.2 / §3B Figure 27）───────────
-    p.strap_bank(289.56, 180.34, [
+    p.strap_bank(289.56, 152.4, [
         ("HDR_I2C1_SCL", "R73", "2K",   "+3V3"),     # 控制 I2C，2kΩ ±5%
         ("HDR_I2C1_SDA", "R74", "2K",   "+3V3"),
         ("HDMI_INT_N",   "R75", "2K",   "+3V3"),     # 開汲極輸出，2kΩ ±10%
@@ -221,7 +235,7 @@ def main():
         ("HDMI_DDC_SDA", "R77", "2K",   "HDMI_5V"),
         ("HDMI_HPD",     "R71", "100K", "GND"),      # 沒插線時定義為低
         ("HDMI_PD",      "R72", "10K",  "GND"),      # ★ 決定 I2C 位址與 PD 極性
-    ])
+    ], pitch=13.97)
     p.stat["上下拉"] = 7
 
     # 三組 1.8V 是經過電感來的、HDMI_5V 是經過保險絲來的 ——

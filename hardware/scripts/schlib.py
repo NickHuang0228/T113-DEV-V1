@@ -120,12 +120,14 @@ def global_label(name, x, y, rot=0, shape="input", justify="right"):
 
 def symbol(lib_id, ref, value, x, y, rot=0, footprint="", unit=1,
            sheet_path="", pins=("1", "2"), desc="", dnp=False,
-           ref_dy=-7.62, val_dy=-5.08):
+           ref_dy=-7.62, val_dy=-5.08, ref_dx=0.0, val_dx=0.0,
+           hide_ref=False):
     """放一個元件實例。
 
     sheet_path 是該圖紙在階層中的 UUID 路徑，必須與目標 .kicad_sch 一致，
     否則 KiCad 會認為這個元件不屬於這張圖，reference 會變成 "?"。
     """
+    hide_r = "\n\t\t\t(hide yes)" if hide_ref else ""
     pin_blk = "".join(f"""		(pin "{p}"
 			(uuid "{uid()}")
 		)
@@ -143,7 +145,7 @@ def symbol(lib_id, ref, value, x, y, rot=0, footprint="", unit=1,
 		(fields_autoplaced yes)
 		(uuid "{uid()}")
 		(property "Reference" "{esc(ref)}"
-			(at {g(x)} {g(y + ref_dy)} 0)
+			(at {g(x + ref_dx)} {g(y + ref_dy)} 0){hide_r}
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -153,7 +155,7 @@ def symbol(lib_id, ref, value, x, y, rot=0, footprint="", unit=1,
 			)
 		)
 		(property "Value" "{esc(value)}"
-			(at {g(x)} {g(y + val_dy)} 0)
+			(at {g(x + val_dx)} {g(y + val_dy)} 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -217,9 +219,13 @@ def power(kind, x, y, rot=0, sheet_path="", net=None):
     （power:Earth）但 net 要叫 GND_CHASSIS：power("Earth", ..., net="GND_CHASSIS")。
     所有電源符號的接點都在 (0,0)，所以 x/y 直接給連接點座標。
     """
+    # Reference 藏起來：真實原理圖不顯示 #PWR。
+    # 不藏的話每一顆電源符號都多一段沒有資訊量的文字，
+    # 十幾顆擠在一起就把真正要看的 net 名稱蓋掉了。
     return symbol(f"power:{kind}", "#PWR", net or kind, x, y, rot,
                   footprint="", sheet_path=sheet_path, pins=("1",),
-                  desc="Power symbol", ref_dy=-3.81, val_dy=3.81)
+                  desc="Power symbol", ref_dy=-3.81, val_dy=3.81,
+                  hide_ref=True)
 
 
 # ── 檔案層級 ────────────────────────────────────────────
@@ -350,9 +356,10 @@ class Page:
         """
         self.rail(net, x, y)
         self.w(x, y, x, y + 3.81)
-        self.part("power:PWR_FLAG", "#FLG", net, x, y + 3.81, 0, "", 1, ("1",),
-                  "Special symbol for telling ERC where power comes from",
-                  ref_dy=3.81, val_dy=6.35)
+        self.out.append(symbol("power:PWR_FLAG", "#FLG", net, x, y + 3.81, 0,
+                               "", 1, self.sheet, ("1",),
+                               "Special symbol for telling ERC where power comes from",
+                               False, 3.81, 6.35, hide_ref=True))
 
     def note(self, body, x, y, size=1.27):
         """把 layout 規則寫在圖紙上。多行用 
@@ -369,9 +376,11 @@ class Page:
         self.out.append(power(k, x, y, 0, self.sheet, net))
 
     def part(self, lib_id, ref, value, x, y, rot=0, fp="", unit=1,
-             pins=("1", "2"), desc="", ref_dy=-7.62, val_dy=-5.08, dnp=False):
+             pins=("1", "2"), desc="", ref_dy=-7.62, val_dy=-5.08, dnp=False,
+             ref_dx=0.0, val_dx=0.0):
         self.out.append(symbol(lib_id, ref, value, x, y, rot, fp, unit,
-                               self.sheet, pins, desc, dnp, ref_dy, val_dy))
+                               self.sheet, pins, desc, dnp, ref_dy, val_dy,
+                               ref_dx, val_dx))
 
     def res(self, ref, value, x, y, rot=90, dnp=False):
         """電阻。rot=90 為水平（接點在 x∓3.81），rot=0 為垂直（y∓3.81）。
@@ -379,12 +388,17 @@ class Page:
         dnp=True 是「焊盤留著但不上件」—— strap 用這個畫出
         「另一種設定怎麼改」，比在文件裡寫一句話可靠得多。
         """
+        # 直立擺的時候文字要往旁邊讓，不然會壓在自己的接線上
+        kw = (dict(ref_dy=-3.81, val_dy=3.81) if rot == 90 else
+              dict(ref_dy=-1.27, val_dy=1.27, ref_dx=5.08, val_dx=5.08))
         self.part("Device:R", ref, value, x, y, rot, R_FP,
-                  desc="Resistor", ref_dy=-3.81, val_dy=3.81, dnp=dnp)
+                  desc="Resistor", dnp=dnp, **kw)
 
     def cap(self, ref, value, x, y, rot=0, fp=None):
+        kw = (dict(ref_dy=-3.81, val_dy=3.81) if rot == 90 else
+              dict(ref_dy=-1.27, val_dy=1.27, ref_dx=5.08, val_dx=5.08))
         self.part("Device:C", ref, value, x, y, rot, fp or C_FP,
-                  desc="Unpolarized capacitor", ref_dy=-3.81, val_dy=3.81)
+                  desc="Unpolarized capacitor", **kw)
 
     # —— 從腳位出發 ——
     def pin_label(self, x, y, side, name, stub=7.62):
@@ -416,6 +430,37 @@ class Page:
         self.res(ref, value, a, y + d * 7.62, 0)
         self.w(a, y + d * 11.43, a, y + d * 13.97)
         self.rail(net, a, y + d * 13.97)
+
+    def pin_bus(self, pins, side, net, stub=6.35, exit_len=10.16):
+        """一組同一條軌的腳位，走一條匯流排、只放一個電源符號。
+
+        ★ 為什麼不每支腳各放一個電源符號
+          腳距是 2.54mm，但電源符號的 Value 文字（"+1V8_DVDD"）寬得多。
+          十三支電源腳各放一個，文字會疊成一團墨 —— 圖上看不清楚
+          就等於沒畫，而佈線的人看的就是這張圖。
+          ERC 不會報這種問題，只有把圖輸出來看才發現。
+
+        做法：腳 →短線→ 垂直匯流排 →從最上面那一列往外拉→ 電源符號。
+        各組的出口在不同的 y，文字就不會互相蓋。
+
+        pins = [(x, y), ...]　同一側、同一條 net。
+        """
+        if not pins:
+            return
+        pins = sorted(pins, key=lambda p: p[1])
+        s = -1 if side == "L" else 1
+        bx = pins[0][0] + s * stub
+        for x, y in pins:
+            self.w(x, y, bx, y)
+        top = pins[0][1]
+        if len(pins) > 1:
+            self.w(bx, top, bx, pins[-1][1])
+            for _, y in pins[1:-1]:
+                self.j(bx, y)
+            self.j(bx, top)          # 短線 + 匯流排 + 出口三條線交會
+        ex = bx + s * exit_len
+        self.w(bx, top, ex, top)
+        self.rail(net, ex, top)
 
     # —— 叢集 ——
     def strap_bank(self, x, y, rows, pitch=15.24):
@@ -510,13 +555,13 @@ class Page:
         self.part("Device:L", lref, lval, x + 11.43, y, 90,
                   "Inductor_SMD:L_1210_3225Metric", desc="Inductor",
                   ref_dy=-3.81, val_dy=3.81)
-        self.w(x + 15.24, y, x + 22.86, y)
+        self.w(x + 15.24, y, x + 27.94, y)
         self.j(x + 19.05, y)
-        self.w(x + 19.05, y, x + 19.05, y + 3.81)
-        self.cap(cref, cval, x + 19.05, y + 7.62, 0, cfp)
-        self.w(x + 19.05, y + 11.43, x + 19.05, y + 13.97)
-        self.rail("GND", x + 19.05, y + 13.97)
-        self.rail(dst, x + 22.86, y)
+        self.w(x + 19.05, y, x + 19.05, y + 7.62)
+        self.cap(cref, cval, x + 19.05, y + 11.43, 0, cfp)
+        self.w(x + 19.05, y + 15.24, x + 19.05, y + 19.05)
+        self.rail("GND", x + 19.05, y + 19.05)
+        self.rail(dst, x + 27.94, y)
 
     # —— 收尾 ——
     def commit(self, note=None):

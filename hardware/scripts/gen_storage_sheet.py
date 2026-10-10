@@ -81,8 +81,8 @@ def main():
            "microSD 卡座，含卡片偵測", ref_dy=-20.32, val_dy=20.32)
     for _, dy, net in SD_LEFT:
         p.pin_label(JX - 22.86, JY - dy, "L", net)
-    for _, dy, net in SD_RAIL:
-        p.pin_rail(JX - 22.86, JY - dy, "L", net)
+    for i, (_, dy, net) in enumerate(SD_RAIL):
+        p.pin_rail(JX - 22.86, JY - dy, "L", net, stub=20.32 + i * 5.08)
     # 外殼接地：卡座金屬殼是手會碰到的地方，不接地等於放一根天線
     p.pin_rail(JX + 20.32, JY + 12.7, "R", "GND")
     p.stat["microSD"] = len(SD_LEFT) + len(SD_RAIL) + 1
@@ -109,9 +109,10 @@ def main():
     # dts 在那之前寫 broken-cd 即可。
     p.w(177.8 - 7.62, 127.0, 177.8 - 7.62 + 7.62, 127.0)
     p.lab("SDC0_DET", 170.18, 127.0, left=True)
-    p.part("Connector:TestPoint", "TP12", "SDC0_DET", 177.8, 127.0, 270,
+    p.part("Connector:TestPoint", "TP12", "TP", 177.8, 127.0, 270,
            "TestPoint:TestPoint_Pad_D1.5mm", 1, ("1",),
-           "測試點", ref_dy=-5.08, val_dy=-2.54)
+           "測試點：microSD 卡片偵測", ref_dy=-2.54, val_dy=2.54,
+           ref_dx=7.62, val_dx=7.62)
     p.stat["卡片偵測測試點"] = 1
 
     # ── U10  SPI NOR ──────────────────────────────────
@@ -144,10 +145,10 @@ def main():
     p.note("SEL1 = SPI0_MISO (PC5) = 0   -> R86 焊、R85 不焊", 228.6, 260.35)
     p.note("SEL0 = SPI0_MOSI (PC4) = 1   -> R87 焊、R88 不焊", 228.6, 265.43)
     p.note("★ 兩個位置都留焊盤：strap 改設定要動焊接，不留位置就得飛線。",
-           228.6, 275.59)
+           228.6, 262.89)
     p.note("★ 不需要專用 FEL 腳：SD 與 NOR 都失敗時 BROM 自己落到 USB FEL。",
-           228.6, 280.67)
-    p.note("   要強制進 FEL 就把 SEL0 拉低變 00（usb 頁的 SW2）。", 228.6, 285.75)
+           228.6, 267.97)
+    p.note("   要強制進 FEL 就把 SEL0 拉低變 00（usb 頁的 SW2）。", 228.6, 273.05)
 
     p.note("⚠ PC4 / PC5 一腳兩用：上電時是 BOOT-SEL，之後才切成 SPI0 的 MOSI/MISO。",
            25.4, 160.02, 1.778)

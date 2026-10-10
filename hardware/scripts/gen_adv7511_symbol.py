@@ -33,14 +33,23 @@ WIDTH = 50.8
 
 # (腳號, 名稱, 電氣型別, 左右)
 UNITS = [
+    # ⚠ 左側的排列順序是依「接哪一條軌」分組的，不是依腳號。
+    #   011 §5 把五個 1.8V 域分成三組，同一組的腳相鄰，原理圖上才能
+    #   走一條匯流排、只放一個電源符號。不分組的話十三個電源符號擠在
+    #   2.54mm 的間距裡，Value 文字會疊成一團墨（ERC 不會報，但圖沒法看）。
     ("A_電源與地", [
+        # 組1 +1V8_DVDD
         ("1",  "DVDD",  "power_in", "L"), ("19", "DVDD",  "power_in", "L"),
         ("49", "DVDD",  "power_in", "L"), ("76", "DVDD",  "power_in", "L"),
         ("77", "DVDD",  "power_in", "L"),
+        # 組2 +1V8_AVDD（AVDD + PVDD）
         ("24", "PVDD",  "power_in", "L"), ("25", "PVDD",  "power_in", "L"),
-        ("21", "PLVDD", "power_in", "L"), ("26", "BGVDD", "power_in", "L"),
         ("29", "AVDD",  "power_in", "L"), ("34", "AVDD",  "power_in", "L"),
-        ("41", "AVDD",  "power_in", "L"), ("47", "MVDD",  "power_in", "L"),
+        ("41", "AVDD",  "power_in", "L"),
+        # 組3 +1V8_PLVDD（PLVDD + BGVDD）
+        ("21", "PLVDD", "power_in", "L"), ("26", "BGVDD", "power_in", "L"),
+        # 組4 +3V3
+        ("47", "MVDD",  "power_in", "L"),
         ("18", "GND", "power_in", "R"), ("20", "GND", "power_in", "R"),
         ("22", "GND", "power_in", "R"), ("23", "GND", "power_in", "R"),
         ("27", "GND", "power_in", "R"), ("31", "GND", "power_in", "R"),

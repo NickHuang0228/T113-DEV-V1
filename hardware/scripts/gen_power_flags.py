@@ -52,9 +52,11 @@ def main():
             # GND 的旗標要畫在下面（接地符號朝下），不然圖形會疊在一起
             p.rail(net, x, ROW_Y + 3.81)
             p.w(x, ROW_Y, x, ROW_Y + 3.81)
-            p.part("power:PWR_FLAG", "#FLG", net, x, ROW_Y, 0, "", 1, ("1",),
-                   "Special symbol for telling ERC where power comes from",
-                   ref_dy=-3.81, val_dy=-6.35)
+            from schlib import symbol
+            p.out.append(symbol("power:PWR_FLAG", "#FLG", net, x, ROW_Y, 0,
+                                "", 1, p.sheet, ("1",),
+                                "Special symbol for telling ERC where power comes from",
+                                False, -3.81, -6.35, hide_ref=True))
         else:
             p.pwr_flag(net, x, ROW_Y)
     p.stat["PWR_FLAG"] = len(FLAGS)

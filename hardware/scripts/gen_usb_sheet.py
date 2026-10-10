@@ -70,8 +70,9 @@ def type_c(p, ref, x, y, dp, dm, cc_refs, vbus="+5V_VBUS"):
     p.w(x - 7.62, y + 22.86, x - 7.62, y + 27.94)        # 外殼
     p.rail("GND", x - 7.62, y + 27.94)
     for i, (dy, ref_r) in enumerate(((10.16, cc_refs[0]), (7.62, cc_refs[1]))):
+        # ⚠ stub 要大於「D± 標籤的位置 + 文字寬度」，否則電阻會疊在標籤上
         p.pin_res_rail_v(px, y - dy, "R", ref_r, "5.1K", "GND",
-                         stub=22.86 + i * 5.08, up=False)
+                         stub=38.1 + i * 7.62, up=False)
     # ⚠ 符號座標的 dy 要變號才是原理圖座標（原理圖 Y 軸向下）。
     #   第一版把 D+ 與 D- 的 y 算反了 —— 圖上看起來完全正常，
     #   但兩個 Type-C 的差分對都會接反。ERC 只因為 A7 剛好落空才報出來。
@@ -169,15 +170,15 @@ def main():
            "Connector_USB:USB_A_Connfly_DS1095", 1,
            ["1", "2", "3", "4", "SH"], "USB-A Host 母座",
            ref_dy=-15.24, val_dy=15.24)
-    p.pin_rail(jx + 7.62, jy - 5.08, "R", "+5V_USB")
+    p.pin_rail(jx + 7.62, jy - 5.08, "R", "+5V_USB", stub=12.7)
     p.w(jx, jy + 10.16, jx, jy + 15.24)
     p.rail("GND", jx, jy + 15.24)
     p.w(jx - 2.54, jy + 10.16, jx - 2.54, jy + 15.24)
     p.rail("GND", jx - 2.54, jy + 15.24)
-    p.w(jx + 7.62, jy, jx + 15.24, jy)
-    p.lab("J6_DP", jx + 15.24, jy)
-    p.w(jx + 7.62, jy + 2.54, jx + 15.24, jy + 2.54)
-    p.lab("J6_DM", jx + 15.24, jy + 2.54)
+    p.w(jx + 7.62, jy, jx + 22.86, jy)
+    p.lab("J6_DP", jx + 22.86, jy)
+    p.w(jx + 7.62, jy + 2.54, jx + 22.86, jy + 2.54)
+    p.lab("J6_DM", jx + 22.86, jy + 2.54)
     esd(p, "D3", 243.84, 111.76, "USB1_DP", "USB1_DM", "J6_DP", "J6_DM")
     p.stat["USB-A Host"] = 6
 
@@ -189,11 +190,12 @@ def main():
     # USB_OC_N 是 TPS2051B 的過流旗標（開汲極，上拉在電源頁的 R9）。
     # PG bank 已經配完，沒有 GPIO 可用，所以拉到測試點 ——
     # 失去的是「軟體讀得到過流」，不影響硬體保護本身（限流是 IC 內部做的）。
-    p.w(236.22, 158.75, 243.84, 158.75)
-    p.lab("USB_OC_N", 236.22, 158.75, left=True)
-    p.part("Connector:TestPoint", "TP13", "USB_OC_N", 243.84, 158.75, 270,
+    p.w(234.95, 158.75, 254.0, 158.75)
+    p.lab("USB_OC_N", 234.95, 158.75, left=True)
+    p.part("Connector:TestPoint", "TP13", "TP", 254.0, 158.75, 270,
            "TestPoint:TestPoint_Pad_D1.5mm", 1, ("1",),
-           "測試點", ref_dy=-5.08, val_dy=-2.54)
+           "測試點：USB 過流旗標", ref_dy=-2.54, val_dy=2.54,
+           ref_dx=7.62, val_dx=7.62)
     p.stat["USB 電源致能"] = 2
 
     # ── SW1 RESET ─────────────────────────────────────
@@ -226,18 +228,18 @@ def main():
     p.stat["PWR_FLAG"] = 1
 
     # ── 圖紙註記 ──────────────────────────────────────
-    p.note("USB 2.0 High Speed layout（004-usb-boot.md §6）", 134.62, 243.84, 1.778)
-    p.note("· 90 ohm 差分，對內等長 ±0.15mm", 134.62, 250.19)
-    p.note("· 480 Mbps -> 上升時間約 500ps -> 臨界長度約 12mm，必須控阻抗", 134.62, 255.27)
-    p.note("· 三對都要認真做：WiFi dongle 與 UVC 攝影機都走 J6 那一對", 134.62, 260.35)
-    p.note("· ESD 元件擺在接頭與晶片之間，貼近接頭", 134.62, 265.43)
+    p.note("USB 2.0 High Speed layout（004-usb-boot.md §6）", 134.62, 231.14, 1.778)
+    p.note("· 90 ohm 差分，對內等長 ±0.15mm", 134.62, 237.49)
+    p.note("· 480 Mbps -> 上升時間約 500ps -> 臨界長度約 12mm，必須控阻抗", 134.62, 242.57)
+    p.note("· 三對都要認真做：WiFi dongle 與 UVC 攝影機都走 J6 那一對", 134.62, 247.65)
+    p.note("· ESD 元件擺在接頭與晶片之間，貼近接頭", 134.62, 252.73)
 
     p.note("★ SW2 = FEL：按住上電把 BOOT-SEL0 拉低 -> 00（NOR > NAND）",
-           134.62, 275.59, 1.778)
+           134.62, 262.89, 1.778)
     p.note("   NOR 空的、沒有 NAND -> BROM 落到 USB FEL。1K 壓贏 storage 頁的 10K。",
-           134.62, 281.94)
+           134.62, 269.24)
     p.note("★ R93 / R94 焊盤距 SDC0 主幹 <=0.5mm；SD 跑不穩先拆這兩顆。",
-           134.62, 287.02)
+           134.62, 274.32)
 
     p.commit()
 
