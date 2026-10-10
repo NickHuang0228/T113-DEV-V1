@@ -54,6 +54,18 @@ GNDS = [
 FOOTPRINTS = [
     ("mcu.kicad_sch", [f"R{i}" for i in range(20, 37)],
      "Resistor_SMD:R_0603_1608Metric", "排針的串接電阻"),
+    # U6 T113-S3：內建的 LQFP-128 沒有 EPAD，所以用本專案自建的那顆
+    #（gen_t113_footprint.py 產生：內建件 + EPAD 5.72 + 5x5 thermal via）
+    ("mcu.kicad_sch", ["U6"],
+     "T113-DEV-V1:eLQFP-128_14x14mm_P0.4mm_EP5.72x5.72mm_ThermalVias",
+     "T113-S3（EPAD 是它唯一的數位地）"),
+    # U1 RY1303：QFN-20 3x3 pitch 0.40，EPAD D2/E2 = 1.65/1.80/1.90
+    #（datasheet V1.9 p.10 Package Description 的尺寸表，008 原本記「封裝圖是圖片」）
+    # 選 EP1.7 不選 1.65 / 1.85 —— 照 008 §5 對 RTL8201F 用過的同一條判準：
+    # land 取「略小於封裝標稱值」。1.80 nom → 1.70 比 nom 小 0.1、又在 min 之上。
+    ("power.kicad_sch", ["U1"],
+     "Package_DFN_QFN:UQFN-20-1EP_3x3mm_P0.4mm_EP1.7x1.7mm_ThermalVias",
+     "RY1303（QFN-20 3x3 P0.4，EP 1.7）"),
 ]
 
 
@@ -101,7 +113,8 @@ def wire_block(txt, a, b):
 
 def main():
     apply = "--apply" in sys.argv
-    guard_kicad_closed(ROOT)
+    if apply:                    # 預覽不寫檔，不必擋 KiCad
+        guard_kicad_closed(ROOT)
     # run_all.py 會在第一步之前檢查一次，之後每一步都會把工作目錄弄髒，
     # 所以它用 --skip-git-check 把這裡關掉。單獨跑的時候仍然要檢查。
     if apply and "--skip-git-check" not in sys.argv and not git_clean():

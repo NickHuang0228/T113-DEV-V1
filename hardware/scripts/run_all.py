@@ -42,7 +42,9 @@ SHEETS = [
 ]
 
 STEPS = (
-    [("修掉手畫頁殘留的 ERC 問題",
+    [("產生 T113-S3 的 eLQFP128 footprint（內建件沒有 EPAD）",
+      ["gen_t113_footprint.py"]),
+     ("修掉手畫頁殘留的 ERC 問題",
       ["fix_legacy.py", "--apply", "--skip-git-check"]),
      ("改名：PG12/PG14/PG4 挪給 HDMI 與面板",
       ["rename_nets.py", "--apply", "--skip-git-check"]),

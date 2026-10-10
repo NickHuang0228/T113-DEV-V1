@@ -380,3 +380,78 @@ v0.2 的結論「只有 T113-S3 需要自建 footprint」**仍然成立**，
 [ ] SPI NOR (XT25F128B) 封裝
 [ ] 電源 IC（RY1303 或分離式）封裝
 ```
+
+---
+
+## 8. RY1303（QFN-20）—— 2026-10-10 補上
+
+v0.4 之前記「封裝圖是圖片，pitch / EP 待核」。
+把 datasheet V1.9 的 p.10「Package Description」render 成圖目視抄出來了：
+
+```
+COMMON DIMENSIONS (MM)      MIN     NOM     MAX
+A                           0.70    0.75    0.80
+A1                          0.00     –      0.05
+A3                          0.20 REF
+D                           2.95    3.00    3.05
+E                           2.95    3.00    3.05
+b                           0.15    0.20    0.25
+L                           0.25    0.30    0.35
+D2  (EPAD)                  1.65    1.80    1.90
+E2  (EPAD)                  1.65    1.80    1.90
+e                           0.40 BSC
+```
+
+**QFN-20，3 × 3 mm，pitch 0.40 mm，EPAD 1.80 × 1.80 mm（nom）。**
+
+### 不需要自建 —— KiCad 有三顆對得上的
+
+```
+QFN-20-1EP_3x3mm_P0.4mm_EP1.65x1.65mm     EP = D2 min
+UQFN-20-1EP_3x3mm_P0.4mm_EP1.7x1.7mm      EP 比 nom 小 0.10     ← 選這個
+UQFN-20-1EP_3x3mm_P0.4mm_EP1.85x1.85mm    EP 比 nom 大 0.05
+```
+
+三顆的訊號 pad 幾乎一樣（pitch 0.4、pad 寬 0.20 = b nom，長度 0.725~0.85），
+差別只在 EPAD 尺寸與絲印。
+
+**選 EP1.7**，判準與 §5 對 RTL8201F 用過的完全相同：
+**EPAD 的 land 取略小於封裝標稱值比較安全。**
+
+```
+不選 1.65   那是 D2 min。零件真的做在 min 時 land 與 pad 剛好一樣大，兩邊都沒餘裕
+不選 1.85   比 nom 還大，錫會往外溢，可能橋到訊號 pad 的內緣
+選  1.70    比 nom 小 0.10、又在 min 之上
+```
+
+EPAD 與訊號 pad 的間隙：訊號 pad 內緣 1.05 mm、EP 半寬 0.85 mm → **0.20 mm**。
+比 T113 那顆（4.065 mm）緊得多，但這是 KiCad 依 IPC-7351 算出來的標準件，照用。
+
+⚠ `UQFN` 的 U 指的是本體厚度（ultra-thin），影響的是絲印與 courtyard，不是 land pattern。
+RY1303 的 A = 0.75 nom 介於 UQFN 與 WQFN 之間，**land pattern 相同，不影響焊接。**
+
+---
+
+## 9. T113-S3 的 eLQFP128 —— 已產生
+
+`hardware/scripts/gen_t113_footprint.py`
+→ `footprints/T113-DEV-V1.pretty/eLQFP-128_14x14mm_P0.4mm_EP5.72x5.72mm_ThermalVias`
+
+做法是拿內建的 `LQFP-128_14x14mm_P0.4mm` 當底，加上它沒有的三樣東西。
+**不從零畫**：128 支腳的座標算錯一支就是整顆報廢，而內建那顆已經對過
+JEDEC MS-026 BEE 四項了（§3.1），自己重算只會多一次出錯機會。
+
+```
+EPAD      5.72 × 5.72 mm 置中，pad "129"
+          與訊號 pad 的間隙 4.065 mm（由腳本從底稿實算，與 §3.2 手算的數字相符）
+錫膏      4 × 4 網格，每格 1.108 mm，覆蓋率 60%
+          刻意與 5×5 的 via 陣列錯開；一整塊開口會放太多錫讓晶片浮起
+via       5 × 5 = 25 顆，間距 1.2 mm，鑽孔 0.3 mm，pad_prop_heatsink
+```
+
+腳本在產生前會擋兩件事：底稿的 pad 數不是 128、或描述裡沒有 MS-026
+（KiCad 換版時會發現）。
+
+⚠ **下單時要指定 via plugged 或背面 tented。**
+不塞住的話回流時錫從 via 漏到背面 → 晶片被墊高 → 128 隻腳同時虛焊，
+**目視完全正常，只有 X-ray 看得到。**
