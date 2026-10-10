@@ -159,3 +159,27 @@ U-Boot mainline      有 T113 / D1 系列支援
 Linux mainline       drivers/gpu/drm/bridge/ite-it66121.c
 sunxi 社群 wiki      https://linux-sunxi.org/
 ```
+
+
+### RTL8201F（乙太 PHY）
+
+| 檔案 | 來源 |
+|---|---|
+| `peripherals/RTL8201F_datasheet_Rev1.4.pdf` | [promelec.ru](https://cdn.promelec.ru/upload/items/2023/10/13/RTL8201F-VB-CG_.pdf) |
+
+⚠ 一份文件涵蓋三種封裝，查腳位時極易拿錯：
+
+```
+§5.1 RTL8201F   QFN-32    ← 本板用這個（Figure 3, p.5）
+§5.2 RTL8201FL  LQFP-48
+§5.3 RTL8201FN  QFN-48
+```
+
+⚠ 多支腳是上電 strap，原理圖要明確定義電平：
+
+```
+LED0/PHYAD[0] (24) · LED1/PHYAD[1] (25)   PHY 位址
+RXD[3]/CLK_CTL (12)                        REF_CLK 方向（MAC 提供 or PHY 提供）
+RXD[2]/INTB (11)                           中斷輸出
+RXER/FXEN (28)                             光纖模式
+```
