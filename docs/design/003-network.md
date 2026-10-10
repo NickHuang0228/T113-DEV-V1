@@ -52,15 +52,60 @@ REF_CLK          50 MHz 參考時脈  ← 最關鍵的一條
 MDC / MDIO       管理介面（讀寫 PHY 暫存器）
 ```
 
-**REF_CLK 的方向要先決定**：
+### ★ REF_CLK 方向：定案為「PHY 提供」（2026-10-10 對 RTL8201F Rev1.4 確認）
 
 ```
-模式 A   PHY 用 25MHz 晶振，內部倍頻產生 50MHz 給 SoC
-模式 B   SoC 產生 50MHz 給 PHY
+RXD[3]/CLK_CTL (pin 12)
+  "RXD[3]/CLK_CTL pin is the Hardware strap in RMII Mode.
+   1: REF_CLK input mode   0: REF_CLK output mode
+   An internal weakly pulled low resistor sets ... to REF_CLK output mode (default)."
+
+TXC (pin 15)
+  "Synchronous 50MHz Clock Reference for Receive, Transmit, and Control Interface.
+   The default direction is reference clock output mode if RXD[3]/CLK_CTL pin floating."
 ```
 
-⚠ 兩種都可行，但**電路與 dts 設定不同**，必須先確定再畫。
-RTL8201F 兩種都支援，由 strap pin 決定。
+**內部已經弱下拉 = 預設就是 output 模式 → CLK_CTL 懸空即可，不必外加元件。**
+
+```
+PHY 自帶 25MHz 晶振（CKXTAL1/CKXTAL2）
+  → 內部倍頻
+  → 從 TXC (pin 15) 輸出 50MHz REF_CLK → T113 PE3
+```
+
+連帶確認兩件事：
+
+```
+PE3 標成 RMII_REF_CLK 是對的   線上跑的就是 50MHz 參考時脈，方向 PHY → SoC
+PE10 (EPHY-25M) 確實用不到      接測試點的決定正確（007 §6.2）
+```
+
+### ★★ 但有一顆 strap 電阻絕對不能漏：RXDV 的 4.7K 上拉
+
+```
+RXDV (pin 8)
+  "This pin should be pulled low when operating in MII mode.
+   0: MII mode   1: RMII mode
+   An internal weakly pulled low resistor sets this to the default of MII mode.
+   It is possible to use an external 4.7KΩ pulled high resistor to enable RMII mode."
+```
+
+**內部下拉 = 預設 MII 模式。不外加上拉的話，整顆 PHY 不會進 RMII。**
+而 T113 這邊只接了 RMII 的七條線 —— MII 需要的腳位根本沒拉出來，結果就是完全不通。
+
+### 四顆 strap 的最終配置
+
+| 腳 | strap 功能 | 本板要的 | 做法 |
+|---|---|---|---|
+| **RXDV (8)** | MII / RMII | **RMII** | **4.7K 上拉到 3.3V** ★ 必要 |
+| RXD[3]/CLK_CTL (12) | REF_CLK 方向 | output | 懸空（內部下拉） |
+| RXER/FXEN (28) | 光纖 / UTP | UTP | 懸空（內部下拉） |
+| RXD[2]/INTB (11) | WOL 中斷 | 不用 | 懸空 |
+| LED0/PHYAD[0] (24)<br>LED1/PHYAD[1] (25) | PHY 位址 | 0 | 接 LED（內部下拉 = 位址 0） |
+
+⚠ **CKXTAL1 (pin 31) 的註記**：
+`"Must be shorted to GND when an external 25MHz/50MHz oscillator or clock drives CKXTAL2."`
+本板用晶振不用有源振盪器，所以 CKXTAL1 接晶振，不接地。
 
 ---
 
