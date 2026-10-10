@@ -221,7 +221,7 @@ def main():
         ("HDMI_INT_N",   "R85", "2K",   "+3V3"),     # 開汲極輸出，2kΩ ±10%
         ("HDMI_DDC_SCL", "R86", "2K",   "HDMI_5V"),  # DDC 依規範上拉到 5V
         ("HDMI_DDC_SDA", "R87", "2K",   "HDMI_5V"),
-        ("HDMI_HPD",     "R89", "100K", "GND"),      # 沒插線時定義為低
+        ("HDMI_HPD",     "R70", "100K", "GND"),      # 沒插線時定義為低
         ("HDMI_PD",      "R82", "10K",  "GND"),      # ★ 決定 I2C 位址與 PD 極性
     ])
     p.stat["上下拉"] = 7

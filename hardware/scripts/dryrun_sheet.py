@@ -42,15 +42,30 @@ def dryrun(modname):
         self.out = []
         self.stat = {}
 
+    def grab(path, blocks):
+        captured.append((path, list(blocks)))
+
     orig_init, orig_append = schlib.Page.__init__, schlib.append_to_sheet
     schlib.Page.__init__ = fake_init
-    schlib.append_to_sheet = lambda path, blocks: captured.append((path, list(blocks)))
+    schlib.append_to_sheet = grab
+    mod = __import__(modname)
+    # 有些生成器是 `from schlib import append_to_sheet` 直接拿名字進自己的
+    # 命名空間的（Page 類別出現之前寫的），改 schlib 的屬性對它們無效，
+    # 所以也要覆蓋模組自己的全域名稱。
+    saved = {}
+    for name, fn in (("guard_kicad_closed", lambda root: None),
+                     ("append_to_sheet", grab),
+                     ("sheet_uuid_of", lambda path: "/DRYRUN/SHEET")):
+        if hasattr(mod, name):
+            saved[name] = getattr(mod, name)
+            setattr(mod, name, fn)
     try:
-        mod = __import__(modname)
         mod.main()
     finally:
         schlib.Page.__init__ = orig_init
         schlib.append_to_sheet = orig_append
+        for name, fn in saved.items():
+            setattr(mod, name, fn)
 
     if not captured:
         return ["✗ 生成器沒有呼叫 append_to_sheet / commit"]

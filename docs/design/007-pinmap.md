@@ -229,9 +229,26 @@ PC5   SPI0-MISO   SDC2-D1   BOOT-SEL1
 **SPI NOR 的 MOSI/MISO 腳同時是開機來源的 strap pin。** BROM 上電時讀這兩支的電平
 決定從哪個裝置開機，之後才切成 SPI 功能。
 
-⚠ 原理圖階段必須確認：SPI NOR 本身的輸入阻抗、以及是否需要外加上下拉電阻，
-才能保證 strap 電平正確。**這是「上電瞬間的電平」問題，不是「訊號完整性」問題** ——
-量測時要抓上電那一刻，不是穩態。
+✅ **已解決（2026-10-10，見 [013-schematic-decisions.md](013-schematic-decisions.md) §1）。**
+
+MangoPi MQ-R 原理圖 p.3 直接印了真值表（同一顆 T113-S3）：
+
+```
+SEL[1:0]   00: NOR > NAND
+           01: SD  > NOR  > Other     ← 本板（有 SD、有 NOR、沒有 NAND）
+         √ 10: SD  > NAND > Other     ← MangoPi 用這個
+           11: SD0 > EMMC2 > EMMC2_USR > Other
+```
+
+本板接法（storage 頁，兩個位置都留焊盤、各只焊一顆）：
+
+```
+SPI0_MISO (PC5, BOOT-SEL1)   10K 下拉 → 0    R96 焊、R95 不焊
+SPI0_MOSI (PC4, BOOT-SEL0)   10K 上拉 → 1    R97 焊、R98 不焊
+```
+
+⚠ 仍然成立的提醒：**這是「上電瞬間的電平」問題，不是「訊號完整性」問題** ——
+量測 strap 電平要抓上電那一刻，穩態量到的是 SPI 波形。
 
 ### 5.4 JTAG 讓給 SD 卡
 
@@ -438,7 +455,10 @@ PG 總共 16 支（WiFi footprint 已移除，全部可用）
 [x] VCC-PG 電壓 → **3.3V**（WiFi 移除後不再被 SDIO 綁住，配合外接模組）
 [x] WiFi footprint → **移除**，PG0~PG5 釋放給排針（2026-09-19 決定）
 [ ] UART0 (console) 的實際腳位（PB bank，待 p.77 核對）
-[ ] 各介面控制訊號的分散配置（面板 RST、ADV7511 RESET#/INT、PHY RST、USB VBUS EN）
+[x] 各介面控制訊號的配置 —— 見 [013](013-schematic-decisions.md) §3
+      PG12 → HDMI_INT_N · PG14 → HDMI_PD · PG4 → PANEL_RESET_N
+      USB_EN 改用 100K 常開、USB_OC_N 改拉測試點
+      ⚠ 代價：排針純 GPIO 從 10 支變 7 支，與 SPEC 不符
 [ ] ADV7511 的 I2C（控制埠）與 INT 腳分配 —— 控制走 TWI，中斷要一支 GPIO
 [ ] 全部腳位回 p.77 Figure 7-1 目視核對
 [ ] 手繪 placement 草圖，與本表一起迭代

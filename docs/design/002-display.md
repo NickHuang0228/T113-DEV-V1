@@ -126,7 +126,10 @@ FR4 傳播延遲      ~6.7 ps/mm
 在 MIPI 模式時讓它保持 reset**，避免它亂驅動或耗電。
 
 ```
-[ ] 原理圖上 ADV7511 的 RESET# 接一支 GPIO，不要直接上拉
+[x] ADV7511 沒有 RESET 腳 —— 它的關機是靠 **PD/AD (pin 38)**。
+      接法：PG14 → HDMI_PD，並在 ADV7511 端加 10K 下拉（R82）。
+      下拉保證上電瞬間的準位（= I2C 位址與 PD 極性），GPIO 之後才能關它。
+      見 [013-schematic-decisions.md](013-schematic-decisions.md) §3
 [ ] 確認 ADV7511 的 reset 腳名稱與極性（回 datasheet Pin Description）
 ```
 
@@ -520,7 +523,7 @@ ADV7511                                    約 180 mA
 **要分組並各自用磁珠或 LC 從幹線隔開**，PLL 那兩支（PVdd/PLVdd）最敏感。
 
 ```
-[ ] 取 HW Guide §7.1 的去耦與分域建議（目前只有 Table 1 的雜訊上限數字）
+[x] 照 011 §5 的三組分法實作：各一組 10µH + 10µF（L4~L6 / C22~C24），每支電源腳再一顆 0.1µF
 ```
 
 #### 電源域淨變化：5 組回到 4 組
@@ -630,7 +633,7 @@ CEC_CLK 不接時要確認 ADV7511 的行為（CEC 功能停用即可）。
 不能只當成一般 GPIO 隨便接 —— 要嘛固定上/下拉，要嘛接 GPIO 但確保上電時的準位確定。
 
 ```
-[ ] 決定 PD/AD 的接法，並在原理圖上標註它決定的 I2C 位址
+[x] PD/AD = GPIO(PG14) + 10K 下拉（display 頁 R82）→ 013 §3
 ```
 
 ### 3.2.3 ★ CLK 要做阻抗控制（新增的 layout 需求）
@@ -677,6 +680,11 @@ CEC_CLK 不接時要確認 ADV7511 的行為（CEC 功能停用即可）。
 **HDMI 座旁邊要放 ESD 保護**（如 SRV05-4 或專用 HDMI ESD 陣列），
 且 ESD 元件的電容要低（<1pF），否則會破壞高頻特性。
 
+⚠ **V1 刻意不放**（2026-10-10，見 [013](013-schematic-decisions.md) §5）：
+符合 <1pF 的料只有 0201 單線件，超出本板手焊能力；而在 TMDS 走線上留
+「不焊的焊盤」本身就是 stub，比不放更糟。理由同時寫在 hdmi 頁的圖紙註記上。
+對照：USB 那邊放了 USBLC6-2SC6（1.5pF）—— 480Mbps 對電容的容忍度高得多。
+
 ### 3.4 DDC 與 HPD
 
 ```
@@ -706,12 +714,12 @@ MIPI 還要對面板 timing、init sequence、lane 設定，變因多得多。
 ## 5. 驗收
 
 ```
-[ ] ★ R_EXT = 887Ω ±1%，走線短，LRCLK 與 via 不靠近 pin 28
+[x] R_EXT = R81 887Ω 1%，畫在腳位旁邊不丟進電阻區；⚠ layout 仍要顧走線短與遠離 LRCLK
 [ ] ★ DDCSDA/DDCSCL 上拉 1.5k~2kΩ 到 HDMI +5V（datasheet 寫 required）
 [ ] ★ SDA/SCL 上拉 2kΩ、INT 上拉 2kΩ 到 3.3V
-[ ] ★ PD/AD (pin 38) 接法已定義，且原理圖標註它決定的 I2C 位址
+[x] PD/AD 下拉 → I2C 位址 0x39/0x3D（7-bit）。⚠ 位址值待 datasheet Table 複核
 [ ] ★ LCD0-CLK 列入阻抗控制清單（單端），走線短、旁無高頻訊號
-[ ] ADV7511 五個 1.8V 域分成 3 組，各加 10µH + 10µF 的 LC
+[x] L4+C22 → DVDD · L5+C23 → AVDD/PVDD · L6+C24 → PLVDD/BGVDD
 [ ] 每支電源腳 0.1µF 貼近腳位；GND 腳各自用 via 下 GND plane
 [ ] MIPI 5 對阻抗 100Ω，對內等長 ±0.1mm，全程不跨分割
 [ ] MIPI 線上無串聯電阻、無 AC 耦合電容
@@ -728,7 +736,7 @@ MIPI 還要對面板 timing、init sequence、lane 設定，變因多得多。
 [ ] ADV7511 的 D[17:16] / D[9:8] / D[1:0] 接 GND（RGB666 未用的 6 個 LSB）
 [ ] ADV7511 未用的 D[35:24] 處置已依 datasheet 確認
 [ ] 原理圖上 RGB 接線一律標 LCD0-D 編號，不用顏色名稱（避免 R/B 對調）
-[ ] ADV7511 的 RESET# 接 GPIO（MIPI 模式時保持 reset）
+[x] 用 PD/AD（ADV7511 沒有 RESET 腳）→ PG14 + 10K 下拉
 [ ] ADV7511 footprint：`LQFP-100_14x14mm_P0.5mm`（MS-026-BED，**無 EPAD**，見 008-footprint.md §4A）
 ```
 

@@ -353,14 +353,18 @@ class Page:
         self.out.append(power(k, x, y, 0, self.sheet, net))
 
     def part(self, lib_id, ref, value, x, y, rot=0, fp="", unit=1,
-             pins=("1", "2"), desc="", ref_dy=-7.62, val_dy=-5.08):
+             pins=("1", "2"), desc="", ref_dy=-7.62, val_dy=-5.08, dnp=False):
         self.out.append(symbol(lib_id, ref, value, x, y, rot, fp, unit,
-                               self.sheet, pins, desc, False, ref_dy, val_dy))
+                               self.sheet, pins, desc, dnp, ref_dy, val_dy))
 
-    def res(self, ref, value, x, y, rot=90):
-        """電阻。rot=90 為水平（接點在 x∓3.81），rot=0 為垂直（y∓3.81）。"""
+    def res(self, ref, value, x, y, rot=90, dnp=False):
+        """電阻。rot=90 為水平（接點在 x∓3.81），rot=0 為垂直（y∓3.81）。
+
+        dnp=True 是「焊盤留著但不上件」—— strap 用這個畫出
+        「另一種設定怎麼改」，比在文件裡寫一句話可靠得多。
+        """
         self.part("Device:R", ref, value, x, y, rot, R_FP,
-                  desc="Resistor", ref_dy=-3.81, val_dy=3.81)
+                  desc="Resistor", ref_dy=-3.81, val_dy=3.81, dnp=dnp)
 
     def cap(self, ref, value, x, y, rot=0, fp=None):
         self.part("Device:C", ref, value, x, y, rot, fp or C_FP,
@@ -412,6 +416,26 @@ class Page:
             self.res(ref, value, x + 11.43, yy, 90)
             self.w(x + 15.24, yy, x + 20.32, yy)
             self.rail(rk, x + 20.32, yy)
+
+    def strap_pair(self, x, y, net, up, dn, fitted):
+        """一條 strap 線的上下拉對：上面一顆到 +3V3、下面一顆到 GND，只焊一顆。
+
+        為什麼兩顆都畫：strap 決定的是「上電那一刻」的設定，
+        改設定要動焊接。把兩個位置都留在板上，改 boot order 不必飛線。
+        （做法照抄 MangoPi MQ-R —— 它的 BOOT-SEL 就是這樣畫的。）
+        up / dn = (ref, value)；fitted = "up" 或 "dn"。
+        """
+        (uref, uval), (dref, dval) = up, dn
+        self.w(x, y - 10.16, x, y + 10.16)
+        self.j(x, y)
+        self.res(uref, uval, x, y - 13.97, 0, dnp=(fitted != "up"))
+        self.w(x, y - 17.78, x, y - 20.32)
+        self.rail("+3V3", x, y - 20.32)
+        self.res(dref, dval, x, y + 13.97, 0, dnp=(fitted != "dn"))
+        self.w(x, y + 17.78, x, y + 20.32)
+        self.rail("GND", x, y + 20.32)
+        self.w(x, y, x - 7.62, y)
+        self.lab(net, x - 7.62, y, left=True)
 
     def cap_bank(self, x, y, specs, top, bottom="GND", pitch=12.7,
                  top_label=False, bus=8.89):

@@ -29,9 +29,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 TOP = os.path.join(ROOT, "T113-DEV-V1.kicad_sch")
 
-SHEET_W, SHEET_H = 93.98, 54.61
-COL_X = (33.02, 139.7, 246.38)      # 根圖紙上三欄擺放
+SHEET_W, SHEET_H = 88.9, 54.61
+COL_X = (15.24, 116.84, 218.44, 320.04)   # 根圖紙上四欄 × 三列 = 12 格
 ROW_Y = (39.37, 109.22, 179.07)
+NCOL = len(COL_X)
 
 
 def blank_sheet(title):
@@ -120,8 +121,10 @@ def main():
     used = re.findall(r'\(page "(\d+)"\)', top)
     page = max([int(p) for p in used] + [1]) + 1
     n_exist = len(re.findall(r'\n\t\(sheet\n', top))
-    x = COL_X[n_exist % 3]
-    y = ROW_Y[n_exist // 3]
+    if n_exist >= NCOL * len(ROW_Y):
+        sys.exit(f"✗ 根圖紙上已經有 {n_exist} 張子頁，格子用完了 —— 先擴 COL_X/ROW_Y")
+    x = COL_X[n_exist % NCOL]
+    y = ROW_Y[n_exist // NCOL]
     sid = str(_uuid.uuid4())
 
     if not os.path.exists(fpath):

@@ -161,20 +161,32 @@ RESET    接 SoC 的 nRESET
 電源     可選；直接插 Type-C 即開機也可以
 ```
 
-⚠ FEL 按鍵接哪一支腳**必須查 datasheet**，各晶片不同。列在 SPEC 的待確認清單。
+✅ **已解決（2026-10-10，見 [013-schematic-decisions.md](013-schematic-decisions.md) §2）：
+本板不需要專用 FEL 腳。**
+
+BOOT-SEL = 01 時 BROM 依序試 SD → NOR → Other，兩個都失敗就落到 USB FEL。
+要主動進 FEL，只要讓 SEL0 在上電瞬間變 0：
+
+```
+SW2：SPI0_MOSI ─[1K]─ 按鍵 ─ GND
+按住上電 → 1K 壓贏 storage 頁的 10K 上拉 → SEL = 00（NOR > NAND）
+        → NOR 空的、沒有 NAND → 直接進 USB FEL
+```
+
+真值表的來源是 MangoPi MQ-R 原理圖 p.3（同一顆 T113-S3）。
 
 ---
 
 ## 8. 驗收
 
 ```
-[ ] 兩個 Type-C 的 CC1/CC2 各接 5.1kΩ 下拉
+[x] 兩個 Type-C 的 CC1/CC2 各接 5.1kΩ 下拉（R100~R103）
 [ ] USB HS 差分 90Ω，對內等長 ±0.15mm，不跨分割
-[ ] USB 資料線 ESD 保護已放，電容 <1pF
-[ ] USB-A Host 的 5V 有限流開關
-[ ] CH340N 接到 UART0，且 UART 排針備援已留
-[ ] FEL 按鍵接到 datasheet 指定的 strap pin
-[ ] RESET 按鍵與上拉電阻
+[x] USB 資料線 ESD = USBLC6-2SC6 ×3，1.5pF（放寬理由見 013 §5）
+[x] USB-A Host 的 5V 有限流開關（U5 TPS2051B，EN 由 R106 100K 常開）
+[x] CH340N 接到 UART0（R104/R105 兩顆 0Ω），排針 pin 23/24 為備援
+[x] FEL 按鍵 = SW2 把 BOOT-SEL0 拉低（013 §2）
+[x] RESET 按鍵 SW1（上拉在電源頁的 R8）
 ```
 
 bring-up 驗證順序：
