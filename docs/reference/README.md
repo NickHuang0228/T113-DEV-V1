@@ -116,6 +116,24 @@
 |---|---|---|---|
 | `boards/MangoPi_MQ-R_sch_v1.6.pdf` | 3 | T113-S3 參考設計 | [mangopi.org](https://mangopi.org/_media/mq-dual_sch_v1.6.pdf) |
 
+⚠ **讀這份要用高 dpi 分區裁切**（整頁 render 看不清元件值）：
+
+```python
+import fitz
+p = fitz.open("mq-dual_sch_v1.6.pdf")[2]          # p.3 是 T113 本體與類比區
+p.search_for("HPOUTFB")                            # 先用文字定位
+p.get_pixmap(dpi=400, clip=fitz.Rect(640,90,900,290)).save("x.png")
+```
+
+已從 p.3 取得的答案：
+
+```
+耳機輸出   HPOUTL/R 各串 33R 再 AC 耦合 0.1µF；HPOUTFB 接耳機座接地環
+VRA1/VRA2  各 0.47µF 到 AGND（C40 / C78）
+類比地     AGND 經 0Ω（R15）單點接 GND
+未用類比腳 FMINL/FMINR 直接打 ✗（No Connect）—— 證明類比輸入可懸空
+```
+
 MangoPi MQ-R 涵蓋範圍：
 
 ```
