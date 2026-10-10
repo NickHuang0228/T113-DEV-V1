@@ -22,7 +22,7 @@
     PANEL_RESET_N  DSI 面板的初始化序列一定要能拉 RESET，
                 沒有它連 DCS 命令都送不進去。MIPI 是本專案第一優先。
   其餘兩個原本也想要 GPIO 的訊號改用不佔腳的做法：
-    USB_EN      100K 上拉常開（usb 頁 R95）—— 失去軟體關閉 USB 埠的能力
+    USB_EN      100K 上拉常開（usb 頁 R75）—— 失去軟體關閉 USB 埠的能力
     USB_OC_N    拉到測試點 TP13 —— 失去軟體讀過流狀態的能力
   這兩個失去的能力都不影響 bring-up，而 HDMI 那兩個會。
 
@@ -73,7 +73,7 @@ DX = {"L": -5.08, "R": 7.62}
 
 def main():
     p = Page(SCH, ROOT)
-    p.part(HDR, "J8", "Conn_02x13", JX, JY, 0, HDR_FP, 1,
+    p.part(HDR, "J7", "Conn_02x13", JX, JY, 0, HDR_FP, 1,
            [str(n) for n in range(1, 27)],
            "2x13 擴充排針", ref_dy=-20.32, val_dy=20.32)
 

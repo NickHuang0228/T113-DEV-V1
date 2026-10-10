@@ -38,7 +38,7 @@ PINS = {"T": (-2.54, "HP_L"), "R": (0.0, "HP_R"), "S": (2.54, "HP_FB")}
 
 def main():
     p = Page(SCH, ROOT)
-    p.part("Connector_Audio:AudioJack3", "J10", "3.5mm 立體聲", JX, JY, 0,
+    p.part("Connector_Audio:AudioJack3", "J9", "3.5mm 立體聲", JX, JY, 0,
            "Connector_Audio:Jack_3.5mm_CUI_SJ1-3523N_Horizontal", 1,
            ("T", "R", "S"), "3.5mm 立體聲座，line-out",
            ref_dy=-12.7, val_dy=12.7)
@@ -48,11 +48,11 @@ def main():
 
     p.note("3.5mm line-out（SPEC：內建 codec → 3.5mm 座）", 25.4, 50.8, 2.54)
     p.note("T113 側的輸出鏈畫在 mcu 頁 unit 6：", 25.4, 60.96)
-    p.note("    HPOUTL  (99)  -[R37 33R]-[C20 0.1uF]- HP_L   -> J10 tip",
+    p.note("    HPOUTL  (99)  -[R37 33R]-[C20 0.1uF]- HP_L   -> J9 tip",
            25.4, 66.04)
-    p.note("    HPOUTR  (98)  -[R38 33R]-[C21 0.1uF]- HP_R   -> J10 ring",
+    p.note("    HPOUTR  (98)  -[R38 33R]-[C21 0.1uF]- HP_R   -> J9 ring",
            25.4, 71.12)
-    p.note("    HPOUTFB (100) ------------------------ HP_FB  -> J10 sleeve",
+    p.note("    HPOUTFB (100) ------------------------ HP_FB  -> J9 sleeve",
            25.4, 76.2)
 
     p.note("★ HP_FB 不是 GND，不可以接地", 25.4, 91.44, 1.778)

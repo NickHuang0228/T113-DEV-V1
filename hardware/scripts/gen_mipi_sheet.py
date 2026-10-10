@@ -76,7 +76,7 @@ PINDX = -5.08                           # 腳在符號左側（用 sym_pins.py �
 
 def main():
     p = Page(SCH, ROOT)
-    p.part(FPC, "J9", "FPC 40P 0.5mm", JX, JY, 0, FPC_FP, 1,
+    p.part(FPC, "J8", "FPC 40P 0.5mm", JX, JY, 0, FPC_FP, 1,
            [str(n) for n in range(1, 41)],
            "MIPI DSI 面板 FPC 座，40 腳 0.5mm pitch",
            ref_dy=-55.88, val_dy=55.88)
@@ -108,8 +108,8 @@ def main():
     # 預設焊 3.3V 是因為多數小尺寸面板用 3.3V，但核對面板之前不要上電。
     # 來源端用電源符號而不是全域標籤：同一條 net 一邊是電源埠、
     # 一邊是同名標籤的話 ERC 會報，看圖的人也會以為是兩條線。
-    for y, ref, src, dnp in ((101.6, "R97", "+3V3", False),
-                             (116.84, "R98", "+1V8_SOC", True)):
+    for y, ref, src, dnp in ((101.6, "R77", "+3V3", False),
+                             (116.84, "R78", "+1V8_SOC", True)):
         p.rail(src, 241.3, y)
         p.w(241.3, y, 248.92, y)
         p.res(ref, "0R", 252.73, y, 90, dnp=dnp)
@@ -138,7 +138,7 @@ def main():
     p.note("    SoC ══════════════════════> FPC 座      （直通，不經任何元件）",
            25.4, 128.27)
     p.note("           ╚═[0Ω]═════════════> ADV7511      （分支）", 20.32, 133.35)
-    p.note("那 10 顆 0Ω 在 display 頁（R71~R80）。", 20.32, 138.43)
+    p.note("那 10 顆 0Ω 在 display 頁（R51~R60）。", 20.32, 138.43)
     p.note("規則：0Ω 焊盤邊緣距離 MIPI 主幹走線 <= 0.5mm。", 20.32, 143.51)
     p.note("放遠了就白做 —— stub 還在，只是換了個位置。", 20.32, 148.59)
     p.note("（HS 上升時間約 200ps，FR4 約 6.7ps/mm -> 臨界長度約 5mm）",
@@ -153,7 +153,7 @@ def main():
            25.4, 185.42)
     p.note("第一版不要同時冒這個險。pin 26~40 保留給它，V2 再補。", 20.32, 190.5)
 
-    p.note("★ IOVCC：R97（3.3V，預設焊）/ R98（1.8V，不焊）二選一",
+    p.note("★ IOVCC：R77（3.3V，預設焊）/ R78（1.8V，不焊）二選一",
            25.4, 205.74, 1.778)
     p.note("焊錯邊的代價是面板報廢 —— 核對面板 datasheet 之前不要上電。",
            25.4, 212.09)

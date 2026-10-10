@@ -127,7 +127,7 @@ FR4 傳播延遲      ~6.7 ps/mm
 
 ```
 [x] ADV7511 沒有 RESET 腳 —— 它的關機是靠 **PD/AD (pin 38)**。
-      接法：PG14 → HDMI_PD，並在 ADV7511 端加 10K 下拉（R82）。
+      接法：PG14 → HDMI_PD，並在 ADV7511 端加 10K 下拉（R62）。
       下拉保證上電瞬間的準位（= I2C 位址與 PD 極性），GPIO 之後才能關它。
       見 [013-schematic-decisions.md](013-schematic-decisions.md) §3
 [ ] 確認 ADV7511 的 reset 腳名稱與極性（回 datasheet Pin Description）
@@ -633,7 +633,7 @@ CEC_CLK 不接時要確認 ADV7511 的行為（CEC 功能停用即可）。
 不能只當成一般 GPIO 隨便接 —— 要嘛固定上/下拉，要嘛接 GPIO 但確保上電時的準位確定。
 
 ```
-[x] PD/AD = GPIO(PG14) + 10K 下拉（display 頁 R72）→ 013 §3
+[x] PD/AD = GPIO(PG14) + 10K 下拉（display 頁 R52）→ 013 §3
 ```
 
 ### 3.2.3 ★ CLK 要做阻抗控制（新增的 layout 需求）
@@ -714,7 +714,7 @@ MIPI 還要對面板 timing、init sequence、lane 設定，變因多得多。
 ## 5. 驗收
 
 ```
-[x] R_EXT = R81 887Ω 1%，畫在腳位旁邊不丟進電阻區；⚠ layout 仍要顧走線短與遠離 LRCLK
+[x] R_EXT = R61 887Ω 1%，畫在腳位旁邊不丟進電阻區；⚠ layout 仍要顧走線短與遠離 LRCLK
 [ ] ★ DDCSDA/DDCSCL 上拉 1.5k~2kΩ 到 HDMI +5V（datasheet 寫 required）
 [ ] ★ SDA/SCL 上拉 2kΩ、INT 上拉 2kΩ 到 3.3V
 [x] PD/AD 下拉 → I2C 位址 0x39/0x3D（7-bit）。⚠ 位址值待 datasheet Table 複核

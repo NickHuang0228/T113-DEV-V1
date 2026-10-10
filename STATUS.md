@@ -33,7 +33,9 @@
       186 顆元件 · 253 條 net · 10 張圖紙
 [ ] ★ 關掉 KiCad，跑 run_all.py --apply          ← 下一步，只有你能做
 [ ] 開 KiCad 看每頁的擺放（元件重疊、標籤被蓋住 —— ERC 檢查不到這個）
-[x] footprint 全部齊了（186 顆元件，每一個都找得到實體檔）
+[x] T113 的逐腳去耦（手畫頁漏了 23 支電源腳，稽核 netlist 才發現）
+[x] designator 全部連號（C 1~84 · R 1~78 · J 1~9）
+[x] footprint 全部齊了（209 顆元件，每一個都找得到實體檔）
       T113 eLQFP128  自建（內建件 + EPAD 5.72 + 5x5 thermal via）
       RY1303 QFN-20  不必自建，datasheet V1.9 p.10 查出 3x3/P0.4/EP1.8
                      → 用內建的 UQFN-20-1EP_3x3mm_P0.4mm_EP1.7x1.7mm

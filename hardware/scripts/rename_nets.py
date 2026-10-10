@@ -13,7 +13,7 @@
     PG12  HDR_GPIO8 → HDMI_INT_N     ADV7511 中斷。HPD 偵測是本專案的練習重點，
                                      輪詢也能做，但中斷才是 driver 真正的寫法。
     PG14  HDR_GPIO9 → HDMI_PD        002 §1.4：MIPI 模式時要能關掉 ADV7511。
-                                     它同時是 I2C 位址的 strap（display 頁 R72 下拉）。
+                                     它同時是 I2C 位址的 strap（display 頁 R52 下拉）。
     PG4   HDR_GPIO7 → PANEL_RESET_N  DSI 面板的初始化序列一定要能拉 RESET，
                                      沒有它連 DCS 命令都送不進去。
 
@@ -21,7 +21,7 @@
 這是刻意的取捨，理由寫在 gen_header_sheet.py 與排針頁的圖紙註記上。
 
 另外兩個也想要 GPIO 的訊號改用不佔腳的做法，所以不在這份清單裡：
-    USB_EN    100K 上拉常開（usb 頁 R95）
+    USB_EN    100K 上拉常開（usb 頁 R75）
     USB_OC_N  拉到測試點 TP13
 
 用法：python hardware/scripts/rename_nets.py          # 預覽

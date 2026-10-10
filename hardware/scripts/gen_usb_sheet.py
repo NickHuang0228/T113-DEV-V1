@@ -8,9 +8,9 @@
   MangoPi MQ-R 原理圖 p.3（BOOT-SEL 真值表，見 gen_storage_sheet.py）
 
 三個 USB 接口各有不同角色，不要搞混：
-  J4  Type-C #1  OTG + FEL 燒錄   → T113 的 USB0（USB0_DP/DM）
-  J5  Type-C #2  UART0 console    → CH340N，再轉 UART0
-  J6  USB-A      Host             → T113 的 USB1，供 WiFi dongle 與 UVC 攝影機
+  J3  Type-C #1  OTG + FEL 燒錄   → T113 的 USB0（USB0_DP/DM）
+  J4  Type-C #2  UART0 console    → CH340N，再轉 UART0
+  J5  USB-A      Host             → T113 的 USB1，供 WiFi dongle 與 UVC 攝影機
 
 ★ UART0 沒有自己的腳位（007 §5.2）。
   Table 4-3 裡 UART0 只有 PE2/PE3 與 PF2/PF4 兩組 mux，兩組都撞到別人。
@@ -123,13 +123,13 @@ def esd(p, ref, x, y, a_dp, a_dm, b_dp, b_dm):
 def main():
     p = Page(SCH, ROOT)
 
-    # ── J4  Type-C #1：OTG + FEL ──────────────────────
-    type_c(p, "J4", 63.5, 63.5, "J4_DP", "J4_DM", ("R89", "R90"))
+    # ── J3  Type-C #1：OTG + FEL ──────────────────────
+    type_c(p, "J3", 63.5, 63.5, "J4_DP", "J4_DM", ("R69", "R70"))
     esd(p, "D1", 152.4, 66.04, "J4_DP", "J4_DM", "USB0_DP", "USB0_DM")
     p.stat["Type-C #1"] = 8
 
-    # ── J5  Type-C #2：UART0 console ──────────────────
-    type_c(p, "J5", 63.5, 177.8, "J5_DP", "J5_DM", ("R91", "R92"))
+    # ── J4  Type-C #2：UART0 console ──────────────────
+    type_c(p, "J4", 63.5, 177.8, "J5_DP", "J5_DM", ("R71", "R72"))
     esd(p, "D2", 152.4, 180.34, "J5_DP", "J5_DM", "CH340_DP", "CH340_DM")
     p.stat["Type-C #2"] = 8
 
@@ -151,7 +151,7 @@ def main():
     p.pin_label(ux + 10.16, uy - 2.54, "R", "UART0_TX_CH")   # TXD → SoC RX
     p.pin_label(ux + 10.16, uy, "R", "UART0_RX_CH")          # RXD ← SoC TX
     p.nc(ux + 10.16, uy + 5.08)                              # RTS 不用
-    p.cap_bank(203.2, 215.9, [("C50", "100nF", None), ("C51", "100nF", None)],
+    p.cap_bank(203.2, 215.9, [("C47", "100nF", None), ("C48", "100nF", None)],
                "+3V3")
     p.stat["CH340N"] = 9
 
@@ -159,14 +159,14 @@ def main():
     # 方向要對：PF2 = UART0-TX（SoC 輸出）→ CH340N 的 RXD
     #           PF4 = UART0-RX（SoC 輸入）← CH340N 的 TXD
     p.series_bank(292.1, 177.8, [
-        ("SDC0_CLK", "R93", "0R", "UART0_RX_CH"),   # SoC TX → CH340N RXD
-        ("SDC0_D3",  "R94", "0R", "UART0_TX_CH"),   # SoC RX ← CH340N TXD
+        ("SDC0_CLK", "R73", "0R", "UART0_RX_CH"),   # SoC TX → CH340N RXD
+        ("SDC0_D3",  "R74", "0R", "UART0_TX_CH"),   # SoC RX ← CH340N TXD
     ], pitch=12.7)
     p.stat["UART0 分支"] = 2
 
-    # ── J6  USB-A Host ────────────────────────────────
+    # ── J5  USB-A Host ────────────────────────────────
     jx, jy = 304.8, 69.85
-    p.part("Connector:USB_A", "J6", "USB-A", jx, jy, 0,
+    p.part("Connector:USB_A", "J5", "USB-A", jx, jy, 0,
            "Connector_USB:USB_A_Connfly_DS1095", 1,
            ["1", "2", "3", "4", "SH"], "USB-A Host 母座",
            ref_dy=-15.24, val_dy=15.24)
@@ -185,7 +185,7 @@ def main():
     # USB_EN 預設上拉：TPS2051B 的 EN 是高有效，而 SoC 的 GPIO 上電時是高阻態。
     # 沒有這顆上拉，軟體跑起來之前 USB-A 完全沒電 —— 連 FEL 階段插隨身碟都不行。
     p.strap_bank(243.84, 142.24, [
-        ("USB_EN", "R95", "100K", "+3V3"),
+        ("USB_EN", "R75", "100K", "+3V3"),
     ])
     # USB_OC_N 是 TPS2051B 的過流旗標（開汲極，上拉在電源頁的 R9）。
     # PG bank 已經配完，沒有 GPIO 可用，所以拉到測試點 ——
@@ -209,12 +209,12 @@ def main():
     p.rail("GND", sx + 12.7, sy)
 
     # ── SW2 FEL ───────────────────────────────────────
-    # 1K 對 GND，壓贏 storage 頁 R87 的 10K 上拉：
+    # 1K 對 GND，壓贏 storage 頁 R67 的 10K 上拉：
     #   按住上電 → SEL0 = 0 → BOOT-SEL 變 00（NOR > NAND）→ 都沒有 → USB FEL
     fx, fy = 63.5, 266.7
     p.lab("SPI0_MOSI", fx - 24.13, fy, left=True)
     p.w(fx - 24.13, fy, fx - 16.51, fy)
-    p.res("R96", "1K", fx - 12.7, fy, 90)
+    p.res("R76", "1K", fx - 12.7, fy, 90)
     p.w(fx - 8.89, fy, fx - 5.08, fy)
     p.part("Switch:SW_Push", "SW2", "FEL", fx, fy, 0, SW_FP, 1, ("1", "2"),
            "輕觸開關", ref_dy=-6.35, val_dy=5.08)
@@ -231,14 +231,14 @@ def main():
     p.note("USB 2.0 High Speed layout（004-usb-boot.md §6）", 134.62, 231.14, 1.778)
     p.note("· 90 ohm 差分，對內等長 ±0.15mm", 134.62, 237.49)
     p.note("· 480 Mbps -> 上升時間約 500ps -> 臨界長度約 12mm，必須控阻抗", 134.62, 242.57)
-    p.note("· 三對都要認真做：WiFi dongle 與 UVC 攝影機都走 J6 那一對", 134.62, 247.65)
+    p.note("· 三對都要認真做：WiFi dongle 與 UVC 攝影機都走 J5 那一對", 134.62, 247.65)
     p.note("· ESD 元件擺在接頭與晶片之間，貼近接頭", 134.62, 252.73)
 
     p.note("★ SW2 = FEL：按住上電把 BOOT-SEL0 拉低 -> 00（NOR > NAND）",
            134.62, 262.89, 1.778)
     p.note("   NOR 空的、沒有 NAND -> BROM 落到 USB FEL。1K 壓贏 storage 頁的 10K。",
            134.62, 269.24)
-    p.note("★ R93 / R94 焊盤距 SDC0 主幹 <=0.5mm；SD 跑不穩先拆這兩顆。",
+    p.note("★ R73 / R74 焊盤距 SDC0 主幹 <=0.5mm；SD 跑不穩先拆這兩顆。",
            134.62, 274.32)
 
     p.commit()

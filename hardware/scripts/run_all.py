@@ -49,7 +49,11 @@ STEPS = (
      ("改名：PG12/PG14/PG4 挪給 HDMI 與面板",
       ["rename_nets.py", "--apply", "--skip-git-check"]),
      ("主晶片頁 unit 6/7（類比音訊 + 系統/USB）", ["gen_mcu_unit67.py"]),
-     ("電源頁補 PWR_FLAG（給 ERC 看的）", ["gen_power_flags.py"])]
+     ("電源頁補 PWR_FLAG（給 ERC 看的）", ["gen_power_flags.py"]),
+     # ★ 稽核 netlist 才發現的：T113 的 23 支電源腳本來一顆本地電容都沒有。
+     #   mcu 頁是手畫的，去耦從來沒補上 —— 整塊板最重要的晶片反而最沒去耦。
+     ("主晶片頁補逐腳去耦（手畫時漏了 23 支電源腳）",
+      ["gen_mcu_decoupling.py"])]
     + [(f"建立子頁 {s}（{t}）", ["new_sheet.py", s, t]) for s, t in SHEETS]
     + [(f"生成 {s} 頁內容", [f"gen_{s}_sheet.py"]) for s, _ in SHEETS]
     # ★ 這一步不能省：lib_symbols 是空的話 KiCad 不知道任何一支腳的座標，

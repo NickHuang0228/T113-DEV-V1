@@ -75,8 +75,8 @@ NOR_LEFT = [("1", 7.62, "SPI0_CS0"), ("6", 5.08, "SPI0_CLK"),
 def main():
     p = Page(SCH, ROOT)
 
-    # ── J7  microSD ───────────────────────────────────
-    p.part(SD, "J7", "microSD", JX, JY, 0, SD_FP, 1,
+    # ── J6  microSD ───────────────────────────────────
+    p.part(SD, "J6", "microSD", JX, JY, 0, SD_FP, 1,
            [str(n) for n in range(1, 10)] + ["SH"],
            "microSD 卡座，含卡片偵測", ref_dy=-20.32, val_dy=20.32)
     for _, dy, net in SD_LEFT:
@@ -95,12 +95,12 @@ def main():
     # SD 規範要求 CMD 與 DAT 線都有上拉。T113 內部有，但外部這一組的作用是
     # 「沒插卡 / 卡還沒初始化」時把線定義住 —— 否則 CMD 浮接會讀到隨機值。
     p.strap_bank(177.8, 50.8, [
-        ("SDC0_CMD", "R79", "10K", "+3V3"),
-        ("SDC0_D0",  "R80", "10K", "+3V3"),
-        ("SDC0_D1",  "R81", "10K", "+3V3"),
-        ("SDC0_D2",  "R82", "10K", "+3V3"),
-        ("SDC0_D3",  "R83", "10K", "+3V3"),
-        ("SDC0_DET", "R84", "10K", "+3V3"),
+        ("SDC0_CMD", "R59", "10K", "+3V3"),
+        ("SDC0_D0",  "R60", "10K", "+3V3"),
+        ("SDC0_D1",  "R61", "10K", "+3V3"),
+        ("SDC0_D2",  "R62", "10K", "+3V3"),
+        ("SDC0_D3",  "R63", "10K", "+3V3"),
+        ("SDC0_DET", "R64", "10K", "+3V3"),
     ])
     p.stat["SD 上拉"] = 6
 
@@ -130,9 +130,9 @@ def main():
 
     # ── BOOT-SEL strap ────────────────────────────────
     p.strap_pair(266.7, 190.5, "SPI0_MISO",
-                 up=("R85", "10K"), dn=("R86", "10K"), fitted="dn")
+                 up=("R65", "10K"), dn=("R66", "10K"), fitted="dn")
     p.strap_pair(327.66, 190.5, "SPI0_MOSI",
-                 up=("R87", "10K"), dn=("R88", "10K"), fitted="up")
+                 up=("R67", "10K"), dn=("R68", "10K"), fitted="up")
     p.stat["BOOT-SEL strap"] = 2
 
     p.note("BOOT-SEL（PC4 / PC5 上電瞬間的電平，來源：MangoPi MQ-R 原理圖 p.3）",
@@ -142,8 +142,8 @@ def main():
            228.6, 240.03)
     p.note("           10: SD  > NAND > Other     <- MangoPi MQ-R 用這個", 228.6, 245.11)
     p.note("           11: SD0 > EMMC2 > EMMC2_USR > Other", 228.6, 250.19)
-    p.note("SEL1 = SPI0_MISO (PC5) = 0   -> R86 焊、R85 不焊", 228.6, 260.35)
-    p.note("SEL0 = SPI0_MOSI (PC4) = 1   -> R87 焊、R88 不焊", 228.6, 265.43)
+    p.note("SEL1 = SPI0_MISO (PC5) = 0   -> R66 焊、R65 不焊", 228.6, 260.35)
+    p.note("SEL0 = SPI0_MOSI (PC4) = 1   -> R67 焊、R68 不焊", 228.6, 265.43)
     p.note("★ 兩個位置都留焊盤：strap 改設定要動焊接，不留位置就得飛線。",
            228.6, 262.89)
     p.note("★ 不需要專用 FEL 腳：SD 與 NOR 都失敗時 BROM 自己落到 USB FEL。",

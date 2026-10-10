@@ -58,10 +58,10 @@ def main():
     # ── HPD：不需要分壓 ───────────────────────────────
     # ADV7511 的 HPD 腳規格是 1.8~5.0V CMOS，HDMI 的 HPD 最高 5.3V 也在範圍內。
     # 串 1K 只是限制故障與 ESD 的灌入電流；未插線時的低準位由
-    # display 頁的 R70（100K 下拉）定義。
+    # display 頁的 R50（100K 下拉）定義。
     hx, hy = JX - 10.16, JY + 17.78
     p.w(hx, hy, hx - 7.62, hy)
-    p.res("R78", "1K", hx - 11.43, hy, 90)
+    p.res("R58", "1K", hx - 11.43, hy, 90)
     p.w(hx - 15.24, hy, hx - 22.86, hy)
     p.lab("HDMI_HPD", hx - 22.86, hy, left=True)
     p.stat["HPD"] = 1
