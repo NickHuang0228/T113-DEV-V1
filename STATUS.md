@@ -4,7 +4,7 @@
 > 現在在哪、什麼已經不會再動、下一步做什麼。
 > 每次開工先看這份，細節再去翻 `docs/`。
 
-最後更新：2026-09-21
+最後更新：2026-10-10
 
 ---
 
@@ -12,7 +12,7 @@
 
 ```
 階段 0  規格與選型     ████████████  完成
-階段 1  原理圖         █████░░░░░░░  進行中  ← 現在在這（電源頁完成）
+階段 1  原理圖         ███████████░  進行中  ← 現在在這（十張頁全部畫完，待跑進 KiCad）
 階段 2  PCB layout     ░░░░░░░░░░░░
 階段 3  出圖與下單     ░░░░░░░░░░░░
 階段 4  bring-up       ░░░░░░░░░░░░
@@ -24,11 +24,15 @@
 [x] T113-S3 符號生成（128 腳，自我一致性檢查通過）
 [x] 合併腳位表成單一來源（2026-09-21）
 [x] 電源符號（gen_power_symbols.py）
-[ ] 電源頁 power.kicad_sch                    ← 現在在這
-[ ] 周邊元件符號（ADV7511 / RTL8201F / CH340N）
-[ ] 電源樹上圖
-[ ] 各介面電路上圖
+[x] 電源頁 power.kicad_sch（33 顆元件）
+[x] 周邊元件符號（ADV7511 100 腳 / RTL8201F 33 腳；CH340N 用 KiCad 內建）
+[x] 主晶片頁 unit 1~5（98 腳）
+[x] 八張子頁的生成器全部寫完並通過 dryrun 檢查   ← 現在在這
+[ ] ★ 關掉 KiCad，跑 run_all.py --apply          ← 下一步，只有你能做
+[ ] 開 KiCad 檢查每頁的擺放（元件重疊、標籤被蓋住）
 [ ] ERC 歸零
+[ ] footprint 補齊（RY1303 QFN、T113 eLQFP128 的 EPAD 要自建）
+[ ] LCSC 料號欄位 → 出 BOM
 ```
 
 ---
@@ -47,6 +51,9 @@ PCB         4 層 · 阻抗控制 · 100×100mm 以內
 bank 電壓   VCC-PD / VCC-PE / VCC-PG 全部 3.3V
 顯示切換    MIPI 與 RGB 共用 PD0~PD9，10 顆 0Ω 二選一
 console     UART0 走 PF2/PF4，2 顆 0Ω 分支到 CH340N
+開機順序    BOOT-SEL = 01（SD > NOR > Other）
+            PC5 下拉、PC4 上拉；真值表來自 MangoPi MQ-R 原理圖 p.3
+FEL         不需要專用腳。SW2 把 BOOT-SEL0 拉低 → BROM 自己落到 USB FEL
 不做        WiFi 模組、CSI、eMMC、JTAG、PMIC
 ```
 
@@ -56,7 +63,10 @@ console     UART0 走 PF2/PF4，2 顆 0Ω 分支到 CH340N
 
 ```
 BOM 價格    T113 實價是原估的 2.8 倍，總成本待重算
-排針        28-pin 規格草案，未最終確認
+排針        2×13 = 26-pin 已定案，但純 GPIO 從 10 支縮到 7 支
+            （PG12/PG14/PG4 挪給 HDMI_INT_N / HDMI_PD / PANEL_RESET_N，
+             理由與代價見 docs/design/013-schematic-decisions.md §3）
+MIPI FPC    40-pin 腳位是暫定值，選定面板後要逐腳核對才能佈線
 電源電流    VDD-CORE / VDD-SYS / VCC-DRAM 在 datasheet 是 TBD
 ```
 
