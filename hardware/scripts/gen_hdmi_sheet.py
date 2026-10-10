@@ -61,7 +61,7 @@ def main():
     # display 頁的 R70（100K 下拉）定義。
     hx, hy = JX - 10.16, JY + 17.78
     p.w(hx, hy, hx - 7.62, hy)
-    p.res("R88", "1K", hx - 11.43, hy, 90)
+    p.res("R78", "1K", hx - 11.43, hy, 90)
     p.w(hx - 15.24, hy, hx - 22.86, hy)
     p.lab("HDMI_HPD", hx - 22.86, hy, left=True)
     p.stat["HPD"] = 1
@@ -92,7 +92,8 @@ def main():
     p.rail("HDMI_5V", 99.06, 124.46)
     p.cap_bank(76.2, 148.59, [("C38", "10uF", "Capacitor_SMD:C_0805_2012Metric"),
                               ("C39", "100nF", None)], "HDMI_5V")
-    p.stat["5V 供電"] = 3
+    p.pwr_flag("HDMI_5V", 110.49, 124.46)
+    p.stat["5V 供電"] = 4
 
     # ── 寫在圖紙上的 layout 規則 ──────────────────────
     p.note("TMDS layout（002-display.md §3.3）", 25.4, 190.5, 1.778)

@@ -79,10 +79,13 @@ RGB_WIRING = {
 ADV7511_TIE_GND = ["78", "80", "87", "88", "95", "96"] + [str(p) for p in range(57, 69)]
 
 # ── 必備的離散元件（值要對）─────────────────────────────────
+# 值的後面允許帶誤差（例如 "887R 1%"）—— 這兩顆的誤差本來就是規格的一部分，
+# 寫在 Value 欄位上，採購與複核時才看得到。規則不該因此判成「找不到」。
+TOL = r"(\s*±?\s*\d+(\.\d+)?\s*%)?$"
 REQUIRED_PARTS = [
     # (描述, 值的正規表示式, 出處)
-    (r"DZQ 校準電阻", r"^240\s*[RΩ]?$", "011-power-tree.md §6.1 / MangoPi R42"),
-    (r"ADV7511 R_EXT", r"^887\s*[RΩ]?$", "011-power-tree.md §6.2 / ADV7511 §7.6"),
+    (r"DZQ 校準電阻", r"^240\s*[RΩ]?" + TOL, "011-power-tree.md §6.1 / MangoPi R42"),
+    (r"ADV7511 R_EXT", r"^887\s*[RΩ]?" + TOL, "011-power-tree.md §6.2 / ADV7511 §7.6"),
 ]
 
 
@@ -113,6 +116,25 @@ def check_power_domains(rows):
 def find_refs(comps, pattern):
     import re
     return [r for r, c in comps.items() if re.search(pattern, c.get("value", ""), re.I)]
+
+
+def zero_ohm_between(nets, comps, na, nb):
+    """兩條 net 之間是不是剛好隔著一顆 0Ω？是的話回傳那顆的 ref。
+
+    本板有兩處刻意用 0Ω 把一條訊號切成兩段 net：
+        PD0~PD9 → ADV7511      （002 §1.2，MIPI 模式時拆掉）
+        SDC0 → CH340N 的 UART0 （007 §5.2，SD 跑不穩時拆掉）
+    檢查規則必須看得懂這個形狀，否則會把正確的設計報成錯。
+    """
+    a = {r for r, _ in nets.get(na, [])}
+    b = {r for r, _ in nets.get(nb, [])}
+    for ref in a & b:
+        if not ref.startswith("R"):
+            continue
+        val = (comps.get(ref, {}).get("value") or "").strip().upper()
+        if val in ("0R", "0", "0Ω", "0 OHM", "0OHM", "DNP"):
+            return ref
+    return None
 
 
 def run(comps, nets, pinmap, norm):
@@ -157,16 +179,25 @@ def run(comps, nets, pinmap, norm):
         #   符號本身是對的，這裡檢查「接到 ADV7511 的對應腳」
         if adv:
             a = adv[0]
+            # ⚠ 不能直接比「同一條 net」。
+            #   PD0~PD9 這 10 條依 002 §1.2 要串一顆 0Ω 才接到 ADV7511
+            #   （mcu 頁的 R10~R19），所以 T113 端與 ADV7511 端本來就是
+            #   兩條不同名的 net。規則要能「穿過一顆 0Ω」再比。
             for tp, (sigdesc, ap) in RGB_WIRING.items():
                 tn = pinmap.get((ref, tp))
                 an = pinmap.get((a, ap))
                 if tn is None or an is None:
                     continue
-                if norm(tn) != norm(an):
-                    out.append(("ERR", "RGB 接線",
-                                f"T113 pin {tp} ({sigdesc}) 在 {norm(tn)}，"
-                                f"但 ADV7511 pin {ap} 在 {norm(an)} —— 兩者應同一條 net"
-                                f"　〔002-display.md §3.2〕"))
+                if norm(tn) == norm(an):
+                    continue
+                link = zero_ohm_between(nets, comps, norm(tn), norm(an))
+                if link:
+                    continue
+                out.append(("ERR", "RGB 接線",
+                            f"T113 pin {tp} ({sigdesc}) 在 {norm(tn)}，"
+                            f"但 ADV7511 pin {ap} 在 {norm(an)}，"
+                            f"中間也沒有 0Ω 串接 —— 兩者應連通"
+                            f"　〔002-display.md §3.2 / §1.2〕"))
 
     # ── ADV7511 電源腳 ────────────────────────────────────
     if adv:

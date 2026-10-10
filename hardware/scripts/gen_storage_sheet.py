@@ -95,12 +95,12 @@ def main():
     # SD 規範要求 CMD 與 DAT 線都有上拉。T113 內部有，但外部這一組的作用是
     # 「沒插卡 / 卡還沒初始化」時把線定義住 —— 否則 CMD 浮接會讀到隨機值。
     p.strap_bank(177.8, 50.8, [
-        ("SDC0_CMD", "R89", "10K", "+3V3"),
-        ("SDC0_D0",  "R90", "10K", "+3V3"),
-        ("SDC0_D1",  "R91", "10K", "+3V3"),
-        ("SDC0_D2",  "R92", "10K", "+3V3"),
-        ("SDC0_D3",  "R93", "10K", "+3V3"),
-        ("SDC0_DET", "R94", "10K", "+3V3"),
+        ("SDC0_CMD", "R79", "10K", "+3V3"),
+        ("SDC0_D0",  "R80", "10K", "+3V3"),
+        ("SDC0_D1",  "R81", "10K", "+3V3"),
+        ("SDC0_D2",  "R82", "10K", "+3V3"),
+        ("SDC0_D3",  "R83", "10K", "+3V3"),
+        ("SDC0_DET", "R84", "10K", "+3V3"),
     ])
     p.stat["SD 上拉"] = 6
 
@@ -129,9 +129,9 @@ def main():
 
     # ── BOOT-SEL strap ────────────────────────────────
     p.strap_pair(266.7, 190.5, "SPI0_MISO",
-                 up=("R95", "10K"), dn=("R96", "10K"), fitted="dn")
+                 up=("R85", "10K"), dn=("R86", "10K"), fitted="dn")
     p.strap_pair(327.66, 190.5, "SPI0_MOSI",
-                 up=("R97", "10K"), dn=("R98", "10K"), fitted="up")
+                 up=("R87", "10K"), dn=("R88", "10K"), fitted="up")
     p.stat["BOOT-SEL strap"] = 2
 
     p.note("BOOT-SEL（PC4 / PC5 上電瞬間的電平，來源：MangoPi MQ-R 原理圖 p.3）",
@@ -141,8 +141,8 @@ def main():
            228.6, 240.03)
     p.note("           10: SD  > NAND > Other     <- MangoPi MQ-R 用這個", 228.6, 245.11)
     p.note("           11: SD0 > EMMC2 > EMMC2_USR > Other", 228.6, 250.19)
-    p.note("SEL1 = SPI0_MISO (PC5) = 0   -> R96 焊、R95 不焊", 228.6, 260.35)
-    p.note("SEL0 = SPI0_MOSI (PC4) = 1   -> R97 焊、R98 不焊", 228.6, 265.43)
+    p.note("SEL1 = SPI0_MISO (PC5) = 0   -> R86 焊、R85 不焊", 228.6, 260.35)
+    p.note("SEL0 = SPI0_MOSI (PC4) = 1   -> R87 焊、R88 不焊", 228.6, 265.43)
     p.note("★ 兩個位置都留焊盤：strap 改設定要動焊接，不留位置就得飛線。",
            228.6, 275.59)
     p.note("★ 不需要專用 FEL 腳：SD 與 NOR 都失敗時 BROM 自己落到 USB FEL。",

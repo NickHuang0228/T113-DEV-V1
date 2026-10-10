@@ -42,18 +42,38 @@ SHEETS = [
 ]
 
 STEPS = (
-    [("改名：PG12/PG14/PG4 挪給 HDMI 與面板", ["rename_nets.py", "--apply"]),
-     ("主晶片頁 unit 6/7（類比音訊 + 系統/USB）", ["gen_mcu_unit67.py"])]
+    [("修掉手畫頁殘留的 ERC 問題",
+      ["fix_legacy.py", "--apply", "--skip-git-check"]),
+     ("改名：PG12/PG14/PG4 挪給 HDMI 與面板",
+      ["rename_nets.py", "--apply", "--skip-git-check"]),
+     ("主晶片頁 unit 6/7（類比音訊 + 系統/USB）", ["gen_mcu_unit67.py"]),
+     ("電源頁補 PWR_FLAG（給 ERC 看的）", ["gen_power_flags.py"])]
     + [(f"建立子頁 {s}（{t}）", ["new_sheet.py", s, t]) for s, t in SHEETS]
     + [(f"生成 {s} 頁內容", [f"gen_{s}_sheet.py"]) for s, _ in SHEETS]
+    # ★ 這一步不能省：lib_symbols 是空的話 KiCad 不知道任何一支腳的座標，
+    #   每一條線都會被判成斷的（第一次跑完是 1309 個 ERC 違規）。
+    # --refresh 連既有的也重建：快取裡若存著舊版符號（改過符號就會），
+    # KiCad 會報 lib_symbol_mismatch，而圖上用的是舊的那顆。
+    + [("重建各頁的符號快取 lib_symbols",
+        ["fill_lib_symbols.py", "--apply", "--refresh"])]
     + [("驗證：電源軌（座標比對）", ["check_power_rails.py"]),
        ("驗證：netlist 規則（kicad-cli）", ["check_schematic.py"])]
 )
 
 
+def git_clean():
+    r = subprocess.run(["git", "status", "--porcelain", "-uno", "--", "hardware"],
+                       cwd=PROJ, capture_output=True, text=True)
+    return r.returncode == 0 and not r.stdout.strip()
+
+
 def main():
     apply = "--apply" in sys.argv
     guard_kicad_closed(ROOT)
+    # 在這裡檢查一次就好。後面每一步都會改檔，若每支腳本各自檢查，
+    # 第二步起一定會因為「工作目錄不乾淨」而中止。
+    if apply and not git_clean():
+        sys.exit("✗ hardware/ 有未提交的變更 —— 先 commit，改壞了才回得去。")
 
     if not apply:
         print("預演 —— 以下步驟會依序執行（加 --apply 才真的跑）：\n")

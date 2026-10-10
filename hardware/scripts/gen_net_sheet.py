@@ -226,10 +226,16 @@ def main():
     p.res("R69", "1M", ix + 6.35, iy, 0)
     p.w(ix - 6.35, iy - 3.81, ix + 6.35, iy - 3.81)
     p.w(ix - 6.35, iy + 3.81, ix + 6.35, iy + 3.81)
+    # T 形接點一定要放 junction —— 線頭落在另一條線的「中間」時，
+    # KiCad 不會自動連，而圖上看起來是連著的。
+    p.j(ix, iy - 3.81)
+    p.j(ix, iy + 3.81)
     p.w(ix, iy - 3.81, ix, iy - 6.35)
     p.rail("GND_CHASSIS", ix, iy - 6.35)
     p.w(ix, iy + 3.81, ix, iy + 6.35)
     p.rail("GND", ix, iy + 6.35)
+    # 機殼地只經過一顆電容與一顆電阻，ERC 認為沒人驅動
+    p.pwr_flag("GND_CHASSIS", ix + 25.4, iy)
     p.stat["地隔離"] = 2
 
     # ── 收尾前先確認 33 支腳一支都沒漏 ──────────────────

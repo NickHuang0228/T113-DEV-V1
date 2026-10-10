@@ -13,7 +13,7 @@
     PG12  HDR_GPIO8 → HDMI_INT_N     ADV7511 中斷。HPD 偵測是本專案的練習重點，
                                      輪詢也能做，但中斷才是 driver 真正的寫法。
     PG14  HDR_GPIO9 → HDMI_PD        002 §1.4：MIPI 模式時要能關掉 ADV7511。
-                                     它同時是 I2C 位址的 strap（display 頁 R82 下拉）。
+                                     它同時是 I2C 位址的 strap（display 頁 R72 下拉）。
     PG4   HDR_GPIO7 → PANEL_RESET_N  DSI 面板的初始化序列一定要能拉 RESET，
                                      沒有它連 DCS 命令都送不進去。
 
@@ -21,7 +21,7 @@
 這是刻意的取捨，理由寫在 gen_header_sheet.py 與排針頁的圖紙註記上。
 
 另外兩個也想要 GPIO 的訊號改用不佔腳的做法，所以不在這份清單裡：
-    USB_EN    100K 上拉常開（usb 頁 R106）
+    USB_EN    100K 上拉常開（usb 頁 R95）
     USB_OC_N  拉到測試點 TP13
 
 用法：python hardware/scripts/rename_nets.py          # 預覽
@@ -53,7 +53,13 @@ RENAMES = [
 
 
 def git_clean():
-    r = subprocess.run(["git", "status", "--porcelain", "--", "hardware"],
+    """只看「已追蹤檔案有沒有被改過」。
+
+    -uno 是必要的：run_all.py 匯入 schlib 就會產生 scripts/__pycache__，
+    那是未追蹤檔，不影響 git checkout 能不能把改壞的內容救回來。
+    不加這個旗標的話，這支腳本永遠認為工作目錄是髒的。
+    """
+    r = subprocess.run(["git", "status", "--porcelain", "-uno", "--", "hardware"],
                        cwd=PROJ, capture_output=True, text=True)
     return r.returncode == 0 and not r.stdout.strip()
 
@@ -61,7 +67,9 @@ def git_clean():
 def main():
     apply = "--apply" in sys.argv
     guard_kicad_closed(ROOT)
-    if apply and not git_clean():
+    # run_all.py 會在第一步之前檢查一次，之後每一步都會把工作目錄弄髒，
+    # 所以它用 --skip-git-check 把這裡關掉。單獨跑的時候仍然要檢查。
+    if apply and "--skip-git-check" not in sys.argv and not git_clean():
         sys.exit("✗ hardware/ 有未提交的變更 —— 先 commit，改壞了才回得去。")
 
     ok = True

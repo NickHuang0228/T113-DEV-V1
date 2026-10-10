@@ -633,7 +633,7 @@ CEC_CLK 不接時要確認 ADV7511 的行為（CEC 功能停用即可）。
 不能只當成一般 GPIO 隨便接 —— 要嘛固定上/下拉，要嘛接 GPIO 但確保上電時的準位確定。
 
 ```
-[x] PD/AD = GPIO(PG14) + 10K 下拉（display 頁 R82）→ 013 §3
+[x] PD/AD = GPIO(PG14) + 10K 下拉（display 頁 R72）→ 013 §3
 ```
 
 ### 3.2.3 ★ CLK 要做阻抗控制（新增的 layout 需求）

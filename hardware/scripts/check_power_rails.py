@@ -266,21 +266,34 @@ def main():
     # 兩支 GPIO 透過各自的 330R 接在一起，軟體一高一低就有穿流，
     # 而且少一個對外接點、GPIO4 憑空消失。
     # 這種錯 netlist 完全合法、看起來一切正常，只有逐一比對才抓得到。
+    # ⚠ 2026-10-10 修正判準。
+    #   原本是「同一條訊號 net 掛了超過一顆電阻就報」。那在只有兩張圖紙時
+    #   夠用，但現在一條訊號上掛好幾顆電阻是正常的設計：
+    #       SPI0_MOSI  = FEL 按鍵的 1K + BOOT-SEL 的上下拉對 + NOR + SoC
+    #       HDR_I2C1_* = 排針的 100R 串接 + ADV7511 的 2K 上拉
+    #       SDC0_D3    = UART0 分支的 0Ω + SD 的 10K 上拉
+    #   照舊判準會把這些全部報成錯 —— 而誤報多了就沒人看了。
+    #
+    #   真正要抓的那個 bug（PG0 與 PG1 都標成 HDR_GPIO2）的特徵是
+    #   **同一顆 SoC 的兩支腳落在同一條訊號 net 上**，直接照這個判。
     from collections import Counter
-    SIGNAL_PREFIX = ("HDR_", "LCD0_", "DSI_", "SDC0_", "SPI0_", "RMII_")
-    dup_sig = Counter()
+    SIGNAL_PREFIX = ("HDR_", "LCD0_", "DSI_", "SDC0_", "SPI0_", "RMII_",
+                     "HDMI_", "USB", "PANEL_", "UART")
+    soc = [r for r in comps if r == "U6"]
+    dup_sig = {}
     for n, v in nets.items():
         if n.startswith(("unconnected-", "Net-")) or not n.startswith(SIGNAL_PREFIX):
             continue
-        rs = [r for r, _ in v if r.startswith("R")]
-        if len(rs) > 1:
-            dup_sig[n] = len(rs)
+        for s in soc:
+            pins = sorted(p for r, p in v if r == s)
+            if len(pins) > 1:
+                dup_sig[n] = f"{s} pin {' + '.join(pins)}"
     if dup_sig:
         print()
-        print("✗ 同一條訊號 net 掛了多顆電阻（可能是兩支腳標成同名）：")
-        for n, c in dup_sig.items():
-            print(f"    {n}  ×{c}")
-        fails.append(f"訊號 net 重複：{dict(dup_sig)}")
+        print("✗ 同一條訊號 net 上有 SoC 的兩支腳（多半是兩支腳標成同名）：")
+        for n, w in dup_sig.items():
+            print(f"    {n}　{w}")
+        fails.append(f"訊號 net 重複：{dup_sig}")
 
     lone = [n for n, v in nets.items()
             if len(v) < 2 and not n.startswith("unconnected-")]

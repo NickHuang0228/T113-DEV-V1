@@ -338,6 +338,22 @@ class Page:
         self.out.append(global_label(name, x, y, 180 if left else 0,
                                      justify="right" if left else "left"))
 
+    def pwr_flag(self, net, x, y):
+        """告訴 ERC「這條電源軌確實有人供電」。
+
+        ERC 的 power_pin_not_driven 是在問「這條軌的源頭是哪支 power_out 腳」。
+        經過電感、保險絲、0Ω、或是從接頭的 passive 腳進來的電，它一律看不出來。
+        PWR_FLAG 不是真元件（不進 BOM、不上板），只是把這個事實標註上去。
+
+        ⚠ 它會讓 ERC 閉嘴，所以只能用在「確實有電進來」的地方 ——
+          拿它去蓋掉真的沒接的軌，等於把安全網剪掉。
+        """
+        self.rail(net, x, y)
+        self.w(x, y, x, y + 3.81)
+        self.part("power:PWR_FLAG", "#FLG", net, x, y + 3.81, 0, "", 1, ("1",),
+                  "Special symbol for telling ERC where power comes from",
+                  ref_dy=3.81, val_dy=6.35)
+
     def note(self, body, x, y, size=1.27):
         """把 layout 規則寫在圖紙上。多行用 
  分隔。"""

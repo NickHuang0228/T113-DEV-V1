@@ -20,6 +20,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import re
 from schlib import (uid, snap, g, wire, junction, no_connect, global_label,
                     symbol, power, sheet_uuid_of, append_to_sheet,
                     guard_kicad_closed)
@@ -38,9 +39,22 @@ C_FP = "Capacitor_SMD:C_0603_1608Metric"
 # 符號本體寬 63.5，腳位伸出 5.08 → 接點在 ±36.83
 PINX = 36.83
 
-# unit 6 放這裡，unit 7 放下面
-U6_AT = (190.5, 320.04)
-U7_AT = (190.5, 441.96)
+# ⚠ unit 6 / unit 7 的符號本體**已經在 KiCad 裡手動放好了**，
+#   這支腳本只負責接線，不再放一份。
+#
+#   第一版寫死座標 (190.5, 320.04) / (190.5, 441.96) 兩個問題：
+#     ① 跟手動放的那一份重複 → ERC 噴 14 個 different_unit_net
+#        （同一支腳出現在兩個地方，各自接到不同的 net）
+#     ② A3 只有 297mm 高，y=320 / y=442 根本在紙面外
+#   所以改成從檔案裡把既有的擺放位置讀出來。
+def find_unit(txt, unit):
+    """從 mcu.kicad_sch 讀出某個 unit 已經被放在哪裡。"""
+    pat = (r'\(symbol\n\t\t\(lib_id "T113-DEV-V1:T113-S3"\)\n'
+           r'\t\t\(at ([\d.]+) ([\d.]+) \d+\)\n\t\t\(unit (\d+)\)')
+    for m in re.finditer(pat, txt):
+        if int(m.group(3)) == unit:
+            return (float(m.group(1)), float(m.group(2)))
+    return None
 
 # (pin, 腳名, 相對 y, 左右)
 U6_PINS = {
@@ -95,13 +109,18 @@ def main():
     path = sheet_uuid_of(SCH)
     if not path:
         sys.exit("✗ 取不到圖紙的階層 UUID 路徑")
+    txt = io.open(SCH, encoding="utf-8").read()
+    U6_AT = find_unit(txt, 6)
+    U7_AT = find_unit(txt, 7)
+    if not U6_AT or not U7_AT:
+        sys.exit("✗ mcu.kicad_sch 上找不到已擺放的 unit 6 / unit 7 —— "
+                 "先在 KiCad 裡把這兩個 unit 放上去再跑")
+    if any(y > 290 for _, y in (U6_AT, U7_AT)):
+        sys.exit(f"✗ unit 6/7 的擺放位置超出 A3 紙面：{U6_AT} {U7_AT}")
     print(f"圖紙路徑 {path}")
+    print(f"沿用既有擺放：unit 6 @{U6_AT}　unit 7 @{U7_AT}")
 
     out = []
-    # ── unit 6 本體 ──
-    out.append(symbol(SYM, "U6", "T113-S3", *U6_AT, unit=6,
-                      sheet_path=path, pins=list(U6_PINS),
-                      desc="Allwinner T113-S3 類比音訊", ref_dy=-20.32, val_dy=20.32))
     n_lab = n_nc = n_ac = 0
     for p, lab in U6_LABEL.items():
         nm, ry, side = U6_PINS[p]
@@ -132,10 +151,7 @@ def main():
         out.append(no_connect(x, y))
         n_nc += 1
 
-    # ── unit 7 本體 ──
-    out.append(symbol(SYM, "U6", "T113-S3", *U7_AT, unit=7,
-                      sheet_path=path, pins=list(U7_PINS),
-                      desc="Allwinner T113-S3 系統/USB", ref_dy=-15.24, val_dy=15.24))
+    # ── unit 7 ──
     for p, lab in U7_LABEL.items():
         nm, ry, side = U7_PINS[p]
         x, y = pin_xy(U7_AT, ry, side)
@@ -163,7 +179,43 @@ def main():
     nm, ry, side = U7_PINS["21"]
     out.append(no_connect(*pin_xy(U7_AT, ry, side)))
 
+    # ── 兩顆晶振 ──────────────────────────────────────
+    # ★ 第一版整個漏掉了。ERC 的 isolated_pin_label（DXIN/DXOUT/X32KIN/X32KOUT
+    #   四個標籤接不到任何東西）才抓出來 —— 沒有 24MHz 晶振，SoC 根本不會動。
+    #
+    # 規格照 MangoPi MQ-R v1.6 p.3（同一顆 T113-S3，已量產驗證過）：
+    #     X1  XTAL2520-24M   CL=18pF    load cap C8/C9   = 22pF
+    #     XT1 32.768K        CL=12.5pF  load cap C43/C45 = 22pF
+    # 晶片端的雜散電容 MangoPi 也標了：DCXO Cshunt 6.5pF、RTC Cshunt 1.1pF。
+    # ⚠ 換晶振一定要重算負載電容 —— 這是唯一會讓板子「時好時壞」的地方。
+    for (cx, cy, ref, val, fp, lin, lout, ca, cb) in (
+            (190.5, 243.84, "Y2", "24MHz",
+             "Crystal:Crystal_SMD_2520-4Pin_2.5x2.0mm",
+             "DXIN", "DXOUT", "C43", "C44"),
+            (266.7, 243.84, "Y3", "32.768kHz",
+             "Crystal:Crystal_SMD_3215-2Pin_3.2x1.5mm",
+             "X32KIN", "X32KOUT", "C45", "C46")):
+        out.append(symbol("Device:Crystal_GND24", ref, val, cx, cy, 0, fp,
+                          sheet_path=path, pins=("1", "2", "3", "4"),
+                          desc="Two pin crystal, GND on pins 2 and 4",
+                          ref_dy=-8.89, val_dy=-6.35))
+        out.append(wire(cx - 3.81, cy, cx - 11.43, cy))
+        out.append(global_label(lin, cx - 11.43, cy, 180, justify="right"))
+        out.append(wire(cx + 3.81, cy, cx + 11.43, cy))
+        out.append(global_label(lout, cx + 11.43, cy, 0, justify="left"))
+        out.append(wire(cx, cy + 5.08, cx, cy + 7.62))
+        out.append(power("GND", cx, cy + 7.62, 0, path))
+        for cref, lx in ((ca, cx - 3.81), (cb, cx + 3.81)):
+            out.append(junction(lx, cy))
+            out.append(wire(lx, cy, lx, cy + 8.89))
+            out.append(symbol("Device:C", cref, "22pF", lx, cy + 12.7, 0, C_FP,
+                              sheet_path=path, desc="Unpolarized capacitor",
+                              ref_dy=-3.81, val_dy=3.81))
+            out.append(wire(lx, cy + 16.51, lx, cy + 19.05))
+            out.append(power("GND", lx, cy + 19.05, 0, path))
+
     append_to_sheet(SCH, out)
+    print("✓ 晶振：Y2 24MHz（DCXO）、Y3 32.768kHz（RTC），各配兩顆 22pF")
     print(f"✓ unit 6：標籤 {len(U6_LABEL)}、耳機鏈 {n_ac} 組、No Connect {n_nc}")
     print(f"✓ unit 7：標籤 {len(U7_LABEL)}、DZQ 240R、No Connect 2")
     print(f"  寫入 {os.path.relpath(SCH, ROOT)}")

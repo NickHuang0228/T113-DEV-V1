@@ -72,23 +72,26 @@ def type_c(p, ref, x, y, dp, dm, cc_refs, vbus="+5V_VBUS"):
     for i, (dy, ref_r) in enumerate(((10.16, cc_refs[0]), (7.62, cc_refs[1]))):
         p.pin_res_rail_v(px, y - dy, "R", ref_r, "5.1K", "GND",
                          stub=22.86 + i * 5.08, up=False)
-    # D-：A7 (dy=-2.54) 與 B7 (dy=0) 短接後拉出去
-    p.w(px, y + 2.54, px + 7.62, y + 2.54)
-    p.w(px, y, px + 7.62, y)
-    p.w(px + 7.62, y, px + 7.62, y + 2.54)
-    p.j(px + 7.62, y + 2.54)
-    p.w(px + 7.62, y + 2.54, px + 15.24, y + 2.54)
-    p.lab(dm, px + 15.24, y + 2.54)
-    # D+：A6 (dy=-5.08) 與 B6 (dy=-7.62) 短接
-    p.w(px, y + 5.08, px + 12.7, y + 5.08)
-    p.w(px, y + 7.62, px + 12.7, y + 7.62)
-    p.w(px + 12.7, y + 5.08, px + 12.7, y + 7.62)
-    p.j(px + 12.7, y + 7.62)
-    p.w(px + 12.7, y + 7.62, px + 15.24, y + 7.62)
-    p.lab(dp, px + 15.24, y + 7.62)
+    # ⚠ 符號座標的 dy 要變號才是原理圖座標（原理圖 Y 軸向下）。
+    #   第一版把 D+ 與 D- 的 y 算反了 —— 圖上看起來完全正常，
+    #   但兩個 Type-C 的差分對都會接反。ERC 只因為 A7 剛好落空才報出來。
+    #     A7 D-  符號 (15.24,  2.54) -> y - 2.54
+    #     B7 D-  符號 (15.24,     0) -> y
+    #     A6 D+  符號 (15.24, -2.54) -> y + 2.54
+    #     B6 D+  符號 (15.24, -5.08) -> y + 5.08
+    p.w(px, y - 2.54, px + 17.78, y - 2.54)        # A7 一路拉到標籤
+    p.w(px, y, px + 7.62, y)                       # B7 往右
+    p.w(px + 7.62, y, px + 7.62, y - 2.54)         # 兩個 D- 短接
+    p.j(px + 7.62, y - 2.54)
+    p.lab(dm, px + 17.78, y - 2.54)
+    p.w(px, y + 2.54, px + 17.78, y + 2.54)        # A6 一路拉到標籤
+    p.w(px, y + 5.08, px + 12.7, y + 5.08)         # B6 往右
+    p.w(px + 12.7, y + 5.08, px + 12.7, y + 2.54)  # 兩個 D+ 短接
+    p.j(px + 12.7, y + 2.54)
+    p.lab(dp, px + 17.78, y + 2.54)
     # SBU 不用（本板不做 DP Alt Mode）
-    p.nc(px, y - 12.7)
-    p.nc(px, y - 15.24 + 30.48)
+    p.nc(px, y + 12.7)
+    p.nc(px, y + 15.24)
 
 
 def esd(p, ref, x, y, a_dp, a_dm, b_dp, b_dm):
@@ -120,12 +123,12 @@ def main():
     p = Page(SCH, ROOT)
 
     # ── J4  Type-C #1：OTG + FEL ──────────────────────
-    type_c(p, "J4", 63.5, 63.5, "J4_DP", "J4_DM", ("R100", "R101"))
+    type_c(p, "J4", 63.5, 63.5, "J4_DP", "J4_DM", ("R89", "R90"))
     esd(p, "D1", 152.4, 66.04, "J4_DP", "J4_DM", "USB0_DP", "USB0_DM")
     p.stat["Type-C #1"] = 8
 
     # ── J5  Type-C #2：UART0 console ──────────────────
-    type_c(p, "J5", 63.5, 177.8, "J5_DP", "J5_DM", ("R102", "R103"))
+    type_c(p, "J5", 63.5, 177.8, "J5_DP", "J5_DM", ("R91", "R92"))
     esd(p, "D2", 152.4, 180.34, "J5_DP", "J5_DM", "CH340_DP", "CH340_DM")
     p.stat["Type-C #2"] = 8
 
@@ -155,15 +158,15 @@ def main():
     # 方向要對：PF2 = UART0-TX（SoC 輸出）→ CH340N 的 RXD
     #           PF4 = UART0-RX（SoC 輸入）← CH340N 的 TXD
     p.series_bank(292.1, 177.8, [
-        ("SDC0_CLK", "R104", "0R", "UART0_RX_CH"),   # SoC TX → CH340N RXD
-        ("SDC0_D3",  "R105", "0R", "UART0_TX_CH"),   # SoC RX ← CH340N TXD
+        ("SDC0_CLK", "R93", "0R", "UART0_RX_CH"),   # SoC TX → CH340N RXD
+        ("SDC0_D3",  "R94", "0R", "UART0_TX_CH"),   # SoC RX ← CH340N TXD
     ], pitch=12.7)
     p.stat["UART0 分支"] = 2
 
     # ── J6  USB-A Host ────────────────────────────────
     jx, jy = 304.8, 69.85
     p.part("Connector:USB_A", "J6", "USB-A", jx, jy, 0,
-           "Connector_USB:USB_A_Connfly_DS1095-BNR0", 1,
+           "Connector_USB:USB_A_Connfly_DS1095", 1,
            ["1", "2", "3", "4", "SH"], "USB-A Host 母座",
            ref_dy=-15.24, val_dy=15.24)
     p.pin_rail(jx + 7.62, jy - 5.08, "R", "+5V_USB")
@@ -181,7 +184,7 @@ def main():
     # USB_EN 預設上拉：TPS2051B 的 EN 是高有效，而 SoC 的 GPIO 上電時是高阻態。
     # 沒有這顆上拉，軟體跑起來之前 USB-A 完全沒電 —— 連 FEL 階段插隨身碟都不行。
     p.strap_bank(243.84, 142.24, [
-        ("USB_EN", "R106", "100K", "+3V3"),
+        ("USB_EN", "R95", "100K", "+3V3"),
     ])
     # USB_OC_N 是 TPS2051B 的過流旗標（開汲極，上拉在電源頁的 R9）。
     # PG bank 已經配完，沒有 GPIO 可用，所以拉到測試點 ——
@@ -204,18 +207,23 @@ def main():
     p.rail("GND", sx + 12.7, sy)
 
     # ── SW2 FEL ───────────────────────────────────────
-    # 1K 對 GND，壓贏 storage 頁 R97 的 10K 上拉：
+    # 1K 對 GND，壓贏 storage 頁 R87 的 10K 上拉：
     #   按住上電 → SEL0 = 0 → BOOT-SEL 變 00（NOR > NAND）→ 都沒有 → USB FEL
     fx, fy = 63.5, 266.7
     p.lab("SPI0_MOSI", fx - 24.13, fy, left=True)
     p.w(fx - 24.13, fy, fx - 16.51, fy)
-    p.res("R107", "1K", fx - 12.7, fy, 90)
+    p.res("R96", "1K", fx - 12.7, fy, 90)
     p.w(fx - 8.89, fy, fx - 5.08, fy)
     p.part("Switch:SW_Push", "SW2", "FEL", fx, fy, 0, SW_FP, 1, ("1", "2"),
            "輕觸開關", ref_dy=-6.35, val_dy=5.08)
     p.w(fx + 5.08, fy, fx + 12.7, fy)
     p.rail("GND", fx + 12.7, fy)
     p.stat["按鍵"] = 2
+
+    # Type-C 的 VBUS 在符號上是 passive 腳，ERC 認為這條軌沒人驅動。
+    # PWR_FLAG 就是用來告訴 ERC「這裡確實有電源進來」的，不是真元件。
+    p.pwr_flag("+5V_VBUS", 115.57, 43.18)
+    p.stat["PWR_FLAG"] = 1
 
     # ── 圖紙註記 ──────────────────────────────────────
     p.note("USB 2.0 High Speed layout（004-usb-boot.md §6）", 134.62, 243.84, 1.778)
@@ -228,7 +236,7 @@ def main():
            134.62, 275.59, 1.778)
     p.note("   NOR 空的、沒有 NAND -> BROM 落到 USB FEL。1K 壓贏 storage 頁的 10K。",
            134.62, 281.94)
-    p.note("★ R104 / R105 焊盤距 SDC0 主幹 <=0.5mm；SD 跑不穩先拆這兩顆。",
+    p.note("★ R93 / R94 焊盤距 SDC0 主幹 <=0.5mm；SD 跑不穩先拆這兩顆。",
            134.62, 287.02)
 
     p.commit()

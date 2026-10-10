@@ -14,9 +14,11 @@ MIPI FPC 座再另一張 —— 100 腳的晶片加上接頭塞不進一張 A3�
 兩個關鍵決定
   ① RGB666：T113 只給得出 18 bit。D0/D1/D8/D9/D16/D17 與 D24~D35 全部接 GND。
      接 GND 而不是把 MSB 複製到 LSB —— 為了 1.2% 的亮度在 6 條線上多掛分支不划算。
-  ② PD0~PD9 這 10 條與 MIPI DSI 共用實體接腳，所以中間串 0Ω：
+  ② PD0~PD9 這 10 條與 MIPI DSI 共用實體接腳，中間要串 0Ω：
        跑 MIPI → 0Ω 不焊，ADV7511 的輸入電容從 MIPI 線上斷開
        跑 HDMI → 0Ω 焊上
+     ★ 那十顆 0Ω 是 mcu 頁的 R10~R19，不在這一頁。
+       這一頁只接 0Ω 的下游（LCD0_D2~D13），不要再串一顆。
      ⚠ layout 時 0Ω 焊盤邊緣距離 MIPI 主幹必須 ≤ 0.5mm，放遠了 stub 還在。
 
 用法：python hardware/scripts/gen_display_sheet.py
@@ -98,14 +100,18 @@ PWR = {"1": "+1V8_DVDD", "19": "+1V8_DVDD", "49": "+1V8_DVDD",
 GND_PINS = ["18", "20", "22", "23", "27", "31", "37", "44", "75", "99", "100"]
 
 # ── 視訊輸入（002 §3.2：按 D 索引 1:1 接，不經過顏色名稱）──
-# 與 MIPI 共用實體接腳的 10 條，中間串 0Ω
-ISO = [("LCD0_D2", "R71", "94"), ("LCD0_D3", "R72", "93"),
-       ("LCD0_D4", "R73", "92"), ("LCD0_D5", "R74", "91"),
-       ("LCD0_D6", "R75", "90"), ("LCD0_D7", "R76", "89"),
-       ("LCD0_D10", "R77", "86"), ("LCD0_D11", "R78", "85"),
-       ("LCD0_D12", "R79", "84"), ("LCD0_D13", "R80", "83")]
-# 不衝突，直接接
-DIRECT = {"82": "LCD0_D14", "81": "LCD0_D15",
+#
+# ⚠ 002 §1.2 要求的那 10 顆 0Ω 隔離電阻 **已經畫在 mcu 頁了**（R10~R19）：
+#       U6 PD0 ──┬── MIPI FPC        直通
+#                └─[R10 0Ω]── LCD0_D2 ── ADV7511 D2
+#   第一版在這裡又串了一顆（R71~R80），變成每條線兩顆 0Ω、兩個分支點，
+#   連「0Ω 焊盤距主幹 ≤0.5mm」這條規則都失去意義（要距離哪一個？）。
+#   所以這裡全部直接接 LCD0_Dx —— 隔離由 mcu 頁那十顆負責。
+DIRECT = {"94": "LCD0_D2", "93": "LCD0_D3", "92": "LCD0_D4",
+          "91": "LCD0_D5", "90": "LCD0_D6", "89": "LCD0_D7",
+          "86": "LCD0_D10", "85": "LCD0_D11", "84": "LCD0_D12",
+          "83": "LCD0_D13",
+          "82": "LCD0_D14", "81": "LCD0_D15",
           "74": "LCD0_D18", "73": "LCD0_D19", "72": "LCD0_D20",
           "71": "LCD0_D21", "70": "LCD0_D22", "69": "LCD0_D23",
           "79": "LCD0_CLK", "97": "LCD0_DE",
@@ -158,17 +164,13 @@ def main():
     p.stat["接地腳"] = len(GND_PINS)
 
     # ── 視訊輸入 ──────────────────────────────────────
-    for src, ref, n in ISO:
-        x, y, s = at(n)
-        p.pin_label(x, y, s, f"HDMI_D{n_to_d(n)}")
     for n, net in DIRECT.items():
         x, y, s = at(n)
         p.pin_label(x, y, s, net)
     for n in VID_GND:
         x, y, s = at(n)
         p.pin_rail(x, y, s, "GND")
-    p.stat["RGB 經 0Ω"] = len(ISO)
-    p.stat["RGB 直接接"] = len(DIRECT)
+    p.stat["RGB 訊號"] = len(DIRECT)
     p.stat["未用輸入接地"] = len(VID_GND)
 
     # ── 控制與 TMDS ───────────────────────────────────
@@ -188,12 +190,8 @@ def main():
     # 設定內部參考電流。datasheet 寫「走線越短越好」，而且特別點名
     # LRCLK（含 via）不可靠近 pin 28 —— 所以畫在腳位旁邊，不丟進電阻區。
     x, y, s = at("28")
-    p.pin_res_rail(x, y, s, "R81", "887R 1%", "GND")
+    p.pin_res_rail(x, y, s, "R70", "887R 1%", "GND")
     p.stat["R_EXT"] = 1
-
-    # ── 0Ω 隔離（PD0~PD9 與 MIPI 共用接腳）────────────
-    p.series_bank(177.8, 40.64,
-                  [(src, ref, "0R", f"HDMI_D{n_to_d(n)}") for src, ref, n in ISO])
 
     # ── 三組 1.8V 的 LC ───────────────────────────────
     for i, (dst, lref, cref) in enumerate((("+1V8_DVDD", "L4", "C22"),
@@ -216,18 +214,24 @@ def main():
 
     # ── 上下拉（002 §3.2.2 / §3B Figure 27）───────────
     p.strap_bank(289.56, 180.34, [
-        ("HDR_I2C1_SCL", "R83", "2K",   "+3V3"),     # 控制 I2C，2kΩ ±5%
-        ("HDR_I2C1_SDA", "R84", "2K",   "+3V3"),
-        ("HDMI_INT_N",   "R85", "2K",   "+3V3"),     # 開汲極輸出，2kΩ ±10%
-        ("HDMI_DDC_SCL", "R86", "2K",   "HDMI_5V"),  # DDC 依規範上拉到 5V
-        ("HDMI_DDC_SDA", "R87", "2K",   "HDMI_5V"),
-        ("HDMI_HPD",     "R70", "100K", "GND"),      # 沒插線時定義為低
-        ("HDMI_PD",      "R82", "10K",  "GND"),      # ★ 決定 I2C 位址與 PD 極性
+        ("HDR_I2C1_SCL", "R73", "2K",   "+3V3"),     # 控制 I2C，2kΩ ±5%
+        ("HDR_I2C1_SDA", "R74", "2K",   "+3V3"),
+        ("HDMI_INT_N",   "R75", "2K",   "+3V3"),     # 開汲極輸出，2kΩ ±10%
+        ("HDMI_DDC_SCL", "R76", "2K",   "HDMI_5V"),  # DDC 依規範上拉到 5V
+        ("HDMI_DDC_SDA", "R77", "2K",   "HDMI_5V"),
+        ("HDMI_HPD",     "R71", "100K", "GND"),      # 沒插線時定義為低
+        ("HDMI_PD",      "R72", "10K",  "GND"),      # ★ 決定 I2C 位址與 PD 極性
     ])
     p.stat["上下拉"] = 7
 
+    # 三組 1.8V 是經過電感來的、HDMI_5V 是經過保險絲來的 ——
+    # 電感與保險絲都是被動件，ERC 看不出這些軌有人供電。
+    for i, net in enumerate(("+1V8_DVDD", "+1V8_AVDD", "+1V8_PLVDD")):
+        p.pwr_flag(net, 30.48 + i * 83.82, 215.9)
+    p.stat["PWR_FLAG"] = 3
+
     # ── 收尾前確認 100 支腳一支都沒漏 ────────────────
-    touched = (set(PWR) | set(GND_PINS) | {n for _, _, n in ISO} | set(DIRECT)
+    touched = (set(PWR) | set(GND_PINS) | set(DIRECT)
                | set(VID_GND) | set(CTRL) | set(TO_GND) | set(NC_PINS) | {"28"})
     allp = set(UNIT_OF)
     miss = sorted(allp - touched, key=int)
@@ -237,13 +241,6 @@ def main():
     print(f"  ✓ U7 的 {len(allp)} 支腳全部有去處")
 
     p.commit("⚠ HDMI 座、5V 保險絲、HPD 串接電阻在 hdmi.kicad_sch")
-
-
-def n_to_d(pin):
-    """ADV7511 腳號 → D 索引。只給 0Ω 隔離那 10 條用。"""
-    tab = {"94": 2, "93": 3, "92": 4, "91": 5, "90": 6, "89": 7,
-           "86": 10, "85": 11, "84": 12, "83": 13}
-    return tab[pin]
 
 
 if __name__ == "__main__":

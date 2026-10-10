@@ -44,13 +44,17 @@ def libs():
 
 
 def block(txt, name):
-    i = txt.find('\n\t(symbol "%s"\n' % name)
-    if i < 0:
-        i = txt.find('\n\t(symbol "%s"' % name)
-        if i < 0:
-            return None
-    j = txt.find('\n\t(symbol "', i + 10)
-    return txt[i:j if j > 0 else len(txt)]
+    """切出頂層符號區塊。
+
+    ⚠ 縮排 tab 與空格都要認：KiCad 內建庫用 tab，
+      本專案 gen_*_symbol.py 產生的庫用 2 個空格。
+    """
+    m = re.search(r'\n([\t ]+)\(symbol "%s"' % re.escape(name), txt)
+    if not m:
+        return None
+    ind = m.group(1)
+    j = txt.find('\n%s(symbol "' % ind, m.start() + 10)
+    return txt[m.start():j if j > 0 else len(txt)]
 
 
 def find(name, _seen=None):

@@ -243,8 +243,8 @@ SEL[1:0]   00: NOR > NAND
 本板接法（storage 頁，兩個位置都留焊盤、各只焊一顆）：
 
 ```
-SPI0_MISO (PC5, BOOT-SEL1)   10K 下拉 → 0    R96 焊、R95 不焊
-SPI0_MOSI (PC4, BOOT-SEL0)   10K 上拉 → 1    R97 焊、R98 不焊
+SPI0_MISO (PC5, BOOT-SEL1)   10K 下拉 → 0    R86 焊、R85 不焊
+SPI0_MOSI (PC4, BOOT-SEL0)   10K 上拉 → 1    R87 焊、R88 不焊
 ```
 
 ⚠ 仍然成立的提醒：**這是「上電瞬間的電平」問題，不是「訊號完整性」問題** ——
