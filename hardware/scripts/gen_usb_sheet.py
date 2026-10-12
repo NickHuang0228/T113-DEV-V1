@@ -124,13 +124,13 @@ def main():
     p = Page(SCH, ROOT)
 
     # ── J3  Type-C #1：OTG + FEL ──────────────────────
-    type_c(p, "J3", 63.5, 63.5, "J4_DP", "J4_DM", ("R69", "R70"))
-    esd(p, "D1", 152.4, 66.04, "J4_DP", "J4_DM", "USB0_DP", "USB0_DM")
+    type_c(p, "J3", 63.5, 63.5, "J4_D_P", "J4_D_N", ("R69", "R70"))
+    esd(p, "D1", 152.4, 66.04, "J4_D_P", "J4_D_N", "USB0_D_P", "USB0_D_N")
     p.stat["Type-C #1"] = 8
 
     # ── J4  Type-C #2：UART0 console ──────────────────
-    type_c(p, "J4", 63.5, 177.8, "J5_DP", "J5_DM", ("R71", "R72"))
-    esd(p, "D2", 152.4, 180.34, "J5_DP", "J5_DM", "CH340_DP", "CH340_DM")
+    type_c(p, "J4", 63.5, 177.8, "J5_D_P", "J5_D_N", ("R71", "R72"))
+    esd(p, "D2", 152.4, 180.34, "J5_D_P", "J5_D_N", "CH340_D_P", "CH340_D_N")
     p.stat["Type-C #2"] = 8
 
     # ── U9  CH340N ────────────────────────────────────
@@ -139,8 +139,8 @@ def main():
            "Package_SO:JEITA_SOIC-8_3.9x4.9mm_P1.27mm", 1,
            [str(n) for n in range(1, 9)],
            "USB 轉 UART，3.3V 介面", ref_dy=-15.24, val_dy=15.24)
-    p.pin_label(ux - 10.16, uy + 2.54, "L", "CH340_DP")    # UD+ (dy=-2.54)
-    p.pin_label(ux - 10.16, uy + 5.08, "L", "CH340_DM")    # UD- (dy=-5.08)
+    p.pin_label(ux - 10.16, uy + 2.54, "L", "CH340_D_P")    # UD+ (dy=-2.54)
+    p.pin_label(ux - 10.16, uy + 5.08, "L", "CH340_D_N")    # UD- (dy=-5.08)
     # V3：3.3V 供電時這支要接到 VCC，再掛 0.1µF 到地（WCH 資料手冊的接法）
     p.w(ux - 10.16, uy - 2.54, ux - 17.78, uy - 2.54)
     p.rail("+3V3", ux - 17.78, uy - 2.54)
@@ -176,10 +176,10 @@ def main():
     p.w(jx - 2.54, jy + 10.16, jx - 2.54, jy + 15.24)
     p.rail("GND", jx - 2.54, jy + 15.24)
     p.w(jx + 7.62, jy, jx + 22.86, jy)
-    p.lab("J6_DP", jx + 22.86, jy)
+    p.lab("J6_D_P", jx + 22.86, jy)
     p.w(jx + 7.62, jy + 2.54, jx + 22.86, jy + 2.54)
-    p.lab("J6_DM", jx + 22.86, jy + 2.54)
-    esd(p, "D3", 243.84, 111.76, "USB1_DP", "USB1_DM", "J6_DP", "J6_DM")
+    p.lab("J6_D_N", jx + 22.86, jy + 2.54)
+    esd(p, "D3", 243.84, 111.76, "USB1_D_P", "USB1_D_N", "J6_D_P", "J6_D_N")
     p.stat["USB-A Host"] = 6
 
     # USB_EN 預設上拉：TPS2051B 的 EN 是高有效，而 SoC 的 GPIO 上電時是高阻態。

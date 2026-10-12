@@ -49,6 +49,30 @@ RENAMES = [
      "PG14 · ADV7511 power-down（同時是 I2C 位址 strap）"),
     ("mcu.kicad_sch", "HDR_GPIO7", "PANEL_RESET_N",
      "PG4 · MIPI 面板 RESET"),
+    # ★ 差分對改名。KiCad 是用 net 名稱的字尾 _P/_N（或 +/-）判斷
+    #   「這兩條是一對」—— DSI_D0P 的字尾是 0P，不符合，所以
+    #   差分對佈線工具與對內等長調整對 MIPI 全部不能用。
+    #   而 MIPI 的差分佈線正是這塊板最主要的練習目標。
+    ("mcu.kicad_sch", "DSI_D0P", "DSI_D0_P",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
+    ("mcu.kicad_sch", "DSI_D0N", "DSI_D0_N",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
+    ("mcu.kicad_sch", "DSI_D1P", "DSI_D1_P",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
+    ("mcu.kicad_sch", "DSI_D1N", "DSI_D1_N",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
+    ("mcu.kicad_sch", "DSI_D2P", "DSI_D2_P",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
+    ("mcu.kicad_sch", "DSI_D2N", "DSI_D2_N",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
+    ("mcu.kicad_sch", "DSI_D3P", "DSI_D3_P",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
+    ("mcu.kicad_sch", "DSI_D3N", "DSI_D3_N",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
+    ("mcu.kicad_sch", "DSI_CKP", "DSI_CK_P",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
+    ("mcu.kicad_sch", "DSI_CKN", "DSI_CK_N",
+     "MIPI 差分對：KiCad 用字尾 _P/_N 才認得出是一對"),
 ]
 
 
