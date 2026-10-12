@@ -62,6 +62,9 @@ STEPS = (
     # KiCad 會報 lib_symbol_mismatch，而圖上用的是舊的那顆。
     + [("重建各頁的符號快取 lib_symbols",
         ["fill_lib_symbols.py", "--apply", "--refresh"])]
+    # 佈線前置：把每條 net 歸到正確的 netclass。
+    # 線寬刻意留空 —— 005 §2 要求用 JLCPCB 的阻抗計算器回算。
+    + [("建立 netclass 分組（佈線用）", ["gen_netclasses.py"])]
     + [("驗證：電源軌（座標比對）", ["check_power_rails.py"]),
        ("驗證：netlist 規則（kicad-cli）", ["check_schematic.py"]),
        # ★ ERC 完全不看「原理圖 ↔ footprint」的對應。

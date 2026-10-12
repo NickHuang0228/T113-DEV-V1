@@ -273,6 +273,84 @@
         "via_diameter": 0.6,
         "via_drill": 0.3,
         "wire_width": 6
+      },
+      {
+        "clearance": 0.2,
+        "name": "MIPI_DSI",
+        "pcb_color": "rgba(220, 60, 180, 1.000)",
+        "priority": 1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6,
+        "description": "100 ohm 差分 · 對內 ±0.1mm · 相對 CK ±0.5mm · 不可有 stub"
+      },
+      {
+        "clearance": 0.2,
+        "name": "TMDS",
+        "pcb_color": "rgba(60, 140, 220, 1.000)",
+        "priority": 2,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6,
+        "description": "100 ohm 差分 · 對內 ±0.15mm · 相對 CK ±0.5mm"
+      },
+      {
+        "clearance": 0.2,
+        "name": "USB_HS",
+        "pcb_color": "rgba(80, 190, 90, 1.000)",
+        "priority": 3,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6,
+        "description": "90 ohm 差分 · 對內 ±0.15mm"
+      },
+      {
+        "clearance": 0.2,
+        "name": "ETH_MDI",
+        "pcb_color": "rgba(230, 160, 40, 1.000)",
+        "priority": 4,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6,
+        "description": "100 ohm 差分 · 過變壓器前後都要控"
+      },
+      {
+        "clearance": 0.2,
+        "name": "RGB_LCD",
+        "pcb_color": "rgba(150, 150, 150, 1.000)",
+        "priority": 5,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6,
+        "description": "單端 · CLK 要控阻抗、走線短、旁邊不走高頻（002 §3.2.3）"
+      },
+      {
+        "clearance": 0.2,
+        "name": "POWER",
+        "pcb_color": "rgba(200, 60, 60, 1.000)",
+        "priority": 6,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6,
+        "description": "線寬依電流另算，不吃 Default 的 0.25mm"
       }
     ],
     "meta": {
@@ -280,7 +358,72 @@
     },
     "net_colors": null,
     "netclass_assignments": null,
-    "netclass_patterns": []
+    "netclass_patterns": [
+      {
+        "netclass": "MIPI_DSI",
+        "pattern": "DSI_*"
+      },
+      {
+        "netclass": "TMDS",
+        "pattern": "TMDS_*"
+      },
+      {
+        "netclass": "USB_HS",
+        "pattern": "USB?_D_*"
+      },
+      {
+        "netclass": "USB_HS",
+        "pattern": "CH340_D_*"
+      },
+      {
+        "netclass": "USB_HS",
+        "pattern": "J4_D_*"
+      },
+      {
+        "netclass": "USB_HS",
+        "pattern": "J5_D_*"
+      },
+      {
+        "netclass": "USB_HS",
+        "pattern": "J6_D_*"
+      },
+      {
+        "netclass": "ETH_MDI",
+        "pattern": "MDI?_*"
+      },
+      {
+        "netclass": "RGB_LCD",
+        "pattern": "LCD0_*"
+      },
+      {
+        "netclass": "RGB_LCD",
+        "pattern": "HDMI_D1?"
+      },
+      {
+        "netclass": "RGB_LCD",
+        "pattern": "HDMI_D?"
+      },
+      {
+        "netclass": "POWER",
+        "pattern": "+*"
+      },
+      {
+        "netclass": "POWER",
+        "pattern": "GND"
+      },
+      {
+        "netclass": "POWER",
+        "pattern": "GND_CHASSIS"
+      },
+      {
+        "netclass": "POWER",
+        "pattern": "HDMI_5V"
+      },
+      {
+        "netclass": "POWER",
+        "pattern": "PANEL_IOVCC"
+      }
+    ]
   },
   "pcbnew": {
     "last_paths": {
