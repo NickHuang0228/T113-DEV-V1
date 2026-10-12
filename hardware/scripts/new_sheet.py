@@ -30,9 +30,15 @@ ROOT = os.path.dirname(HERE)
 TOP = os.path.join(ROOT, "T113-DEV-V1.kicad_sch")
 
 SHEET_W, SHEET_H = 88.9, 54.61
-COL_X = (15.24, 116.84, 218.44, 320.04)   # 根圖紙上四欄 × 三列 = 12 格
-ROW_Y = (39.37, 109.22, 179.07)
-NCOL = len(COL_X)
+# 候選擺放位置。不能單純「第 n 張放第 n 格」——
+# 電源與 Main Chip 兩張是手動放的，位置不在格線上，而且 Main Chip
+# 比標準格子大（100×71mm），照格線放會被後面的子頁蓋住。
+# 下面只是候選清單，實際放之前會逐一檢查有沒有和既有方塊重疊。
+SLOTS = (
+    (137.16, 39.37), (236.22, 39.37), (320.04, 39.37),
+    (170.18, 109.22), (269.24, 109.22),
+    (15.24, 215.9), (114.3, 215.9), (213.36, 215.9), (312.42, 215.9),
+)
 
 
 def blank_sheet(title):
@@ -120,11 +126,21 @@ def main():
     root_uuid = re.search(r'\(uuid "([0-9a-f-]+)"\)', top).group(1)
     used = re.findall(r'\(page "(\d+)"\)', top)
     page = max([int(p) for p in used] + [1]) + 1
-    n_exist = len(re.findall(r'\n\t\(sheet\n', top))
-    if n_exist >= NCOL * len(ROW_Y):
-        sys.exit(f"✗ 根圖紙上已經有 {n_exist} 張子頁，格子用完了 —— 先擴 COL_X/ROW_Y")
-    x = COL_X[n_exist % NCOL]
-    y = ROW_Y[n_exist // NCOL]
+    # 既有方塊（含手動放的那兩張）的矩形，用來避開
+    boxes = []
+    for m in re.finditer(r'\n\t\(sheet\n\t\t\(at ([\d.]+) ([\d.]+)\)\n'
+                         r'\t\t\(size ([\d.]+) ([\d.]+)\)', top):
+        boxes.append(tuple(map(float, m.groups())))
+
+    def clash(x, y):
+        return any(x < bx + bw and bx < x + SHEET_W
+                   and y < by + bh and by < y + SHEET_H
+                   for bx, by, bw, bh in boxes)
+
+    pos = next(((x, y) for x, y in SLOTS if not clash(x, y)), None)
+    if pos is None:
+        sys.exit(f"✗ 候選位置都被佔住了（既有 {len(boxes)} 張）—— 先擴 SLOTS")
+    x, y = pos
     sid = str(_uuid.uuid4())
 
     if not os.path.exists(fpath):
