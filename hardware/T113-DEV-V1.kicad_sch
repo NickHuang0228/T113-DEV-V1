@@ -108,4 +108,372 @@
 		)
 	)
 	(embedded_fonts no)
+	(sheet
+		(at 137.16 39.37)
+		(size 88.9 54.61)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "c3a76e60-d9c8-4c3d-b2f8-950f8878271c")
+		(property "Sheetname" "顯示 · ADV7511"
+			(at 137.16 38.6584 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "display.kicad_sch"
+			(at 137.16 94.9346 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "T113-DEV-V1"
+				(path "/00000000-0000-0000-0000-000000000001"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 236.22 39.37)
+		(size 88.9 54.61)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "61dbd8b6-448c-4f68-839a-f4b080c99f6b")
+		(property "Sheetname" "顯示 · HDMI 座"
+			(at 236.22 38.6584 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "hdmi.kicad_sch"
+			(at 236.22 94.9346 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "T113-DEV-V1"
+				(path "/00000000-0000-0000-0000-000000000001"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 170.18 109.22)
+		(size 88.9 54.61)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "d30f161f-80bf-4ea0-9a4f-249213f4e6bb")
+		(property "Sheetname" "顯示 · MIPI DSI"
+			(at 170.18 108.508 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "mipi.kicad_sch"
+			(at 170.18 164.785 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "T113-DEV-V1"
+				(path "/00000000-0000-0000-0000-000000000001"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 269.24 109.22)
+		(size 88.9 54.61)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "aeeb6e43-4a42-44b3-a244-ba902fb555a5")
+		(property "Sheetname" "網路"
+			(at 269.24 108.508 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "net.kicad_sch"
+			(at 269.24 164.785 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "T113-DEV-V1"
+				(path "/00000000-0000-0000-0000-000000000001"
+					(page "7")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 15.24 215.9)
+		(size 88.9 54.61)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "9c8f6b90-6af3-4f33-9214-51629cd19c1b")
+		(property "Sheetname" "USB 與開機"
+			(at 15.24 215.188 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "usb.kicad_sch"
+			(at 15.24 271.465 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "T113-DEV-V1"
+				(path "/00000000-0000-0000-0000-000000000001"
+					(page "8")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 114.3 215.9)
+		(size 88.9 54.61)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "f83cc6c3-b0db-42bd-b3b8-508efbe8680e")
+		(property "Sheetname" "儲存"
+			(at 114.3 215.188 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "storage.kicad_sch"
+			(at 114.3 271.465 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "T113-DEV-V1"
+				(path "/00000000-0000-0000-0000-000000000001"
+					(page "9")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 213.36 215.9)
+		(size 88.9 54.61)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "5aacc781-4099-4863-bd54-919fe7066a4f")
+		(property "Sheetname" "排針"
+			(at 213.36 215.188 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "header.kicad_sch"
+			(at 213.36 271.465 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "T113-DEV-V1"
+				(path "/00000000-0000-0000-0000-000000000001"
+					(page "10")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 312.42 215.9)
+		(size 88.9 54.61)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "f72b88bf-c6c9-45b0-afba-b2d2d993069a")
+		(property "Sheetname" "音訊"
+			(at 312.42 215.188 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "audio.kicad_sch"
+			(at 312.42 271.465 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "T113-DEV-V1"
+				(path "/00000000-0000-0000-0000-000000000001"
+					(page "11")
+				)
+			)
+		)
+	)
 )
