@@ -188,23 +188,29 @@ def main():
     #     XT1 32.768K        CL=12.5pF  load cap C43/C45 = 22pF
     # 晶片端的雜散電容 MangoPi 也標了：DCXO Cshunt 6.5pF、RTC Cshunt 1.1pF。
     # ⚠ 換晶振一定要重算負載電容 —— 這是唯一會讓板子「時好時壞」的地方。
-    for (cx, cy, ref, val, fp, lin, lout, ca, cb) in (
-            (190.5, 243.84, "Y2", "24MHz",
-             "Crystal:Crystal_SMD_2520-4Pin_2.5x2.0mm",
+    # ⚠ 符號的腳數必須與 footprint 的焊盤數對上，否則 Update PCB 會報錯。
+    #   Y2 2520 是 4 腳（兩支外殼接地），Y3 3215 實物只有 2 腳 ——
+    #   一開始兩顆都用 Crystal_GND24（4 腳），Y3 就對不上了。
+    #   這種錯 ERC 看不到：ERC 只驗原理圖，不驗原理圖與 footprint 的對應。
+    for (cx, cy, ref, val, sym_id, fp, npin, shield,
+         lin, lout, ca, cb) in (
+            (190.5, 243.84, "Y2", "24MHz", "Device:Crystal_GND24",
+             "Crystal:Crystal_SMD_2520-4Pin_2.5x2.0mm", ("1", "2", "3", "4"), True,
              "DXIN", "DXOUT", "C43", "C44"),
-            (266.7, 243.84, "Y3", "32.768kHz",
-             "Crystal:Crystal_SMD_3215-2Pin_3.2x1.5mm",
+            (266.7, 243.84, "Y3", "32.768kHz", "Device:Crystal",
+             "Crystal:Crystal_SMD_3215-2Pin_3.2x1.5mm", ("1", "2"), False,
              "X32KIN", "X32KOUT", "C45", "C46")):
-        out.append(symbol("Device:Crystal_GND24", ref, val, cx, cy, 0, fp,
-                          sheet_path=path, pins=("1", "2", "3", "4"),
-                          desc="Two pin crystal, GND on pins 2 and 4",
-                          ref_dy=-8.89, val_dy=-6.35))
+        out.append(symbol(sym_id, ref, val, cx, cy, 0, fp,
+                          sheet_path=path, pins=list(npin),
+                          desc="Crystal", ref_dy=-8.89, val_dy=-6.35))
+        # 兩種符號的訊號接點都在 ∓3.81，所以座標不必分開算
         out.append(wire(cx - 3.81, cy, cx - 11.43, cy))
         out.append(global_label(lin, cx - 11.43, cy, 180, justify="right"))
         out.append(wire(cx + 3.81, cy, cx + 11.43, cy))
         out.append(global_label(lout, cx + 11.43, cy, 0, justify="left"))
-        out.append(wire(cx, cy + 5.08, cx, cy + 7.62))
-        out.append(power("GND", cx, cy + 7.62, 0, path))
+        if shield:
+            out.append(wire(cx, cy + 5.08, cx, cy + 7.62))
+            out.append(power("GND", cx, cy + 7.62, 0, path))
         for cref, lx in ((ca, cx - 3.81), (cb, cx + 3.81)):
             out.append(junction(lx, cy))
             out.append(wire(lx, cy, lx, cy + 8.89))

@@ -63,7 +63,11 @@ STEPS = (
     + [("重建各頁的符號快取 lib_symbols",
         ["fill_lib_symbols.py", "--apply", "--refresh"])]
     + [("驗證：電源軌（座標比對）", ["check_power_rails.py"]),
-       ("驗證：netlist 規則（kicad-cli）", ["check_schematic.py"])]
+       ("驗證：netlist 規則（kicad-cli）", ["check_schematic.py"]),
+       # ★ ERC 完全不看「原理圖 ↔ footprint」的對應。
+       #   TP9~TP11 被設成繼電器、Y3 的 4 腳符號配 2 腳封裝，
+       #   都是 ERC 全過、要到 Update PCB 才爆的錯。
+       ("驗證：腳號對得上焊盤（Update PCB 的前提）", ["check_footprints.py"])]
 )
 
 

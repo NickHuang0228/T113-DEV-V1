@@ -69,6 +69,16 @@ FOOTPRINTS = [
 ]
 
 
+# 要「改掉」的 footprint：手畫時選錯了（不是空白，是錯的值）。
+# TP9/TP10/TP11 被設成繼電器 —— 原理圖上看不出來，
+# 而「有沒有填 footprint」的檢查也過得去，要比對腳號與焊盤號才發現。
+FOOTPRINT_WRONG = [
+    ("mcu.kicad_sch", ["TP9", "TP10", "TP11"],
+     "Relay_THT:Relay_DPDT_Schrack-RT2-FormC_RM5mm",
+     "TestPoint:TestPoint_Pad_D1.5mm", "測試點被設成繼電器"),
+]
+
+
 def git_clean():
     r = subprocess.run(["git", "status", "--porcelain", "-uno", "--", "hardware"],
                        cwd=PROJ, capture_output=True, text=True)
@@ -160,6 +170,22 @@ def main():
         if todo:
             plans.append(("fp", path, (todo, fp)))
 
+    for fname, refs, wrong, right, why in FOOTPRINT_WRONG:
+        path = os.path.join(ROOT, fname)
+        s = io.open(path, encoding="utf-8").read()
+        todo = [r for r in refs
+                if f'(property "Footprint" "{wrong}"' in (sym_block(s, r) or "")]
+        done = all(f'(property "Footprint" "{right}"' in (sym_block(s, r) or "")
+                   for r in refs)
+        tag = "✓" if (todo or done) else "✗"
+        if tag == "✗":
+            ok = False
+        print(f"  {tag} {fname}  改正 footprint {len(todo)}/{len(refs)} 顆 —— {why}")
+        print(f"      {wrong}")
+        print(f"      -> {right}")
+        if todo:
+            plans.append(("fpfix", path, (todo, wrong, right)))
+
     if not ok:
         sys.exit("\n✗ 有項目不符預期，一項都沒改。")
     if not apply:
@@ -174,6 +200,17 @@ def main():
         elif kind == "gnd":
             x, y = arg
             append_to_sheet(path, [power("GND", x, y, 0, sheet_uuid_of(path))])
+        elif kind == "fpfix":
+            refs, wrong, right = arg
+            s = io.open(path, encoding="utf-8").read()
+            for ref in refs:
+                blk = sym_block(s, ref)
+                if not blk:
+                    continue
+                s = s.replace(blk, blk.replace(
+                    f'(property "Footprint" "{wrong}"',
+                    f'(property "Footprint" "{right}"', 1), 1)
+            io.open(path, "w", encoding="utf-8", newline="\n").write(s)
         else:
             refs, fp = arg
             s = io.open(path, encoding="utf-8").read()
