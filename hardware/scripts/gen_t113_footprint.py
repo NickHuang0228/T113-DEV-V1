@@ -130,6 +130,10 @@ def main():
                'Vias must be plugged or tented (008-footprint.md 3.3)."',
                t, count=1)
     t = re.sub(r'\(tags "[^"]*"', '(tags "QFP LQFP eLQFP T113 Allwinner EPAD"', t, count=1)
+    # 內部的 Value 文字也要改 —— 放到板上時會被元件自己的 Value 蓋掉，
+    # 但在 footprint 編輯器裡看到舊名字會誤導（以為選錯了）。
+    t = re.sub(r'\(property "Value" "LQFP-128[^"]*"',
+               f'(property "Value" "{NAME}"', t, count=1)
 
     os.makedirs(OUTDIR, exist_ok=True)
     dst = os.path.join(OUTDIR, NAME + ".kicad_mod")

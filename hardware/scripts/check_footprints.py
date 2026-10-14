@@ -16,10 +16,13 @@
 
   共通點：**原理圖上完全正常，BOM 也正常，只有把兩邊擺在一起比才看得出來。**
 
-檢查三件事
+檢查四件事
   ① Footprint 欄位不是空的
   ② 那個 footprint 檔案真的存在（專案庫優先，再找 KiCad 內建庫）
   ③ 原理圖用到的每一個腳號，都能在 footprint 的焊盤編號裡找到
+  ④ 自建的 footprint 庫，KiCad 自己解析得動
+     （用 `kicad-cli fp export svg` 驗 —— 自建件是用程式產生的，
+       格式壞掉的話要到 Update PCB 才發現，而那時已經在佈線了）
 
 ⚠ 反過來不檢查：footprint 有、但原理圖沒用到的焊盤是正常的
   （機構固定腳、未使用的 shield pad 等）。
@@ -133,6 +136,28 @@ def main():
             print(f"       {f}")
             print(f"       原理圖用到但焊盤沒有的編號：{miss}")
             print(f"       footprint 的焊盤編號（前 10 個，共 {n} 個）：{pads}")
+    # ④ 自建庫能不能被 KiCad 解析
+    own = os.path.join(ROOT, "footprints")
+    if os.path.isdir(own):
+        import shutil
+        for lib in sorted(d for d in os.listdir(own) if d.endswith(".pretty")):
+            tmp = tempfile.mkdtemp()
+            r = subprocess.run([find_cli(), "fp", "export", "svg",
+                                os.path.join(own, lib), "-o", tmp],
+                               capture_output=True, text=True,
+                               encoding="utf-8", errors="replace")
+            n_mod = len([f for f in os.listdir(os.path.join(own, lib))
+                         if f.endswith(".kicad_mod")])
+            n_svg = len([f for f in os.listdir(tmp) if f.endswith(".svg")])
+            shutil.rmtree(tmp, ignore_errors=True)
+            if r.returncode != 0 or n_svg < n_mod:
+                bad += 1
+                print(f"\n✗ 自建庫 {lib}　KiCad 解析不動"
+                      f"（{n_mod} 個 .kicad_mod 只匯出 {n_svg} 個 SVG）")
+                print((r.stderr or r.stdout)[:400])
+            else:
+                print(f"\n✓ 自建庫 {lib}　{n_mod} 個 footprint，KiCad 都解析得動")
+
     if not bad:
         print("\n✓ 全部元件的腳號都對得上焊盤 —— 可以 Update PCB")
     sys.exit(1 if bad else 0)

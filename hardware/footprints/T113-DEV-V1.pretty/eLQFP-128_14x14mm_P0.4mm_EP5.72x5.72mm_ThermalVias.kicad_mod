@@ -14,7 +14,7 @@
 			)
 		)
 	)
-	(property "Value" "LQFP-128_14x14mm_P0.4mm"
+	(property "Value" "eLQFP-128_14x14mm_P0.4mm_EP5.72x5.72mm_ThermalVias"
 		(at 0 9.35 0)
 		(layer "F.Fab")
 		(effects
